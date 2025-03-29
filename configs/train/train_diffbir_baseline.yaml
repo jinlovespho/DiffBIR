@@ -159,23 +159,24 @@ train:
   # pretrained sd v2.1 path
   sd_path: ./weights/v2-1_512-ema-pruned.ckpt
   # experiment directory path
-  exp_dir: ./results/train_stage2
+  exp_dir: ./results/test
   # stage 1 swinir path.
   # In our paper, we use SwinIR trained on ImageNet-1k with codeformer degradation.
   swinir_path: ./weights/codeformer_swinir.ckpt
   resume: ./weights/DiffBIR_v2.1.pt
-  learning_rate: 1e-4
+  learning_rate: 1e-5
   # ImageNet 1k (1.3M images)
   # batch size = 192, lr = 1e-4, total training steps = 25k
   # Our filtered laion2b-en (15M images)
   # batch size = 256, lr = 1e-4 (first 30k), 1e-5 (next 50k), total training steps = 80k
   noise_aug_timestep: 0
   num_workers: 4
-  batch_size: 20
+  batch_size: 4
   train_steps: 30000
   log_every: 50
   ckpt_every: 10000
   image_every: 1000
+  log_num_train_img: 4
   
 val:
   batch_size: 6
@@ -184,10 +185,10 @@ val:
   image_every: 100
 
 log_args:
-  log_tool: wandba
+  log_tool: wandb
   wandb_key: e32eed0c2509bf898b850b0065ab62345005fb73
   wandb_proj_name: DiffBIR_OCR_finetuning
-  wandb_exp_name: test
+  wandb_exp_name: pho_server5_gpu1_diffbir_baseline_FTonlyctrlnet_bs4_lr1e-5
 
 exp_args:
   model_name: diffbir_baseline

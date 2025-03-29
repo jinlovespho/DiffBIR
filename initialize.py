@@ -11,25 +11,26 @@ import torch
 
 def load_experiment_settings(accelerator, cfg):
 
-    # setup wandb 
-    if accelerator.is_main_process:
-        if cfg.log_args.log_tool == 'wandb':
-            wandb.login(key=cfg.log_args.wandb_key)
-            wandb.init(project=cfg.log_args.wandb_proj_name, 
-                    name=cfg.log_args.wandb_exp_name, 
-                    config=argparse.Namespace(**OmegaConf.to_container(cfg, resolve=True))
-            )
 
     # setup an experiment folder
-    if accelerator.is_main_process:
-        exp_dir = cfg.train.exp_dir
-        os.makedirs(exp_dir, exist_ok=True)
-        ckpt_dir = os.path.join(exp_dir, "checkpoints")
-        os.makedirs(ckpt_dir, exist_ok=True)
-        # tensorboard logger
-        writer = SummaryWriter(exp_dir)
-    return exp_dir, ckpt_dir, writer
+    exp_dir = cfg.train.exp_dir
+    os.makedirs(exp_dir, exist_ok=True)
+    ckpt_dir = os.path.join(exp_dir, "checkpoints")
+    os.makedirs(ckpt_dir, exist_ok=True)
 
+
+    # setup logging tool
+    if cfg.log_args.log_tool == 'wandb':
+        wandb.login(key=cfg.log_args.wandb_key)
+        wandb.init(project=cfg.log_args.wandb_proj_name, 
+                name=cfg.log_args.wandb_exp_name, 
+                config=argparse.Namespace(**OmegaConf.to_container(cfg, resolve=True))
+        )
+        return exp_dir, ckpt_dir, None
+    
+    elif cfg.log_args.log_tool == 'tensorboard':
+        writer = SummaryWriter(exp_dir)
+        return exp_dir, ckpt_dir, writer
 
 def load_data(accelerator, cfg):
 
@@ -106,7 +107,7 @@ def load_model(accelerator, device, cfg):
         if accelerator.is_main_process:
             print(f"load SwinIR from {cfg.train.swinir_path}")
 
-        # set models to cuda
+        # set mode and cuda
         loaded_models['cldm'] = cldm.train().to(device)
         loaded_models['swinir'] = swinir.eval().to(device)
     

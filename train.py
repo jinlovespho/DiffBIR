@@ -13,8 +13,11 @@ from diffbir.sampler import SpacedSampler
 import initialize
 import cv2 
 import numpy as np
+import wandb
 
-def main(args) -> None:
+
+def main(args):
+
 
     # set accelerator, seed, device, config
     accelerator = Accelerator(split_batches=True)
@@ -24,7 +27,8 @@ def main(args) -> None:
     
 
     # load logging tools and ckpt directory
-    exp_dir, ckpt_dir, writer = initialize.load_experiment_settings(accelerator, cfg)
+    if accelerator.is_main_process:
+        exp_dir, ckpt_dir, writer = initialize.load_experiment_settings(accelerator, cfg)
 
 
     # load data
@@ -48,7 +52,7 @@ def main(args) -> None:
     diffusion: Diffusion = instantiate_from_config(cfg.model.diffusion)
     diffusion.to(device)
     sampler = SpacedSampler(diffusion.betas, diffusion.parameterization, rescale_cfg=False)
-    
+
 
     # setup accelerator    
     models = {k: accelerator.prepare(v) for k, v in models.items()}
@@ -56,6 +60,8 @@ def main(args) -> None:
 
 
     # etc
+    cldm = models['cldm']
+    swinir = models['swinir']
     pure_cldm: ControlLDM = accelerator.unwrap_model(models['cldm'])
     noise_aug_timestep = cfg.train.noise_aug_timestep
 
@@ -78,6 +84,7 @@ def main(args) -> None:
     step_loss = []
     epoch = 0
     epoch_loss = []
+
 
     # Training Loop
     while global_step < max_steps:
@@ -109,9 +116,9 @@ def main(args) -> None:
             lq = rearrange(lq, "b h w c -> b c h w").contiguous().float()   # b 3 512 512
 
             with torch.no_grad():
-                z_0 = pure_cldm.vae_encode(gt)
-                clean = models['swinir'](lq)
-                cond = pure_cldm.prepare_condition(clean, prompt)
+                z_0 = pure_cldm.vae_encode(gt)  # b 4 64 64
+                clean = swinir(lq)    # b 3 512 512
+                cond = pure_cldm.prepare_condition(clean, prompt)   # cond['c_txt'], cond['c_img']
                 # noise augmentation
                 cond_aug = copy.deepcopy(cond)
                 if noise_aug_timestep > 0:
@@ -144,14 +151,14 @@ def main(args) -> None:
                 # Gather values from all processes
                 avg_loss = (
                     accelerator.gather(
-                        torch.tensor(step_loss, device=device).unsqueeze(0)
-                    )
-                    .mean()
-                    .item()
-                )
+                        torch.tensor(step_loss, device=device).unsqueeze(0)).mean().item()
+                        )
                 step_loss.clear()
+
+                # log training loss
                 if accelerator.is_main_process:
-                    writer.add_scalar("loss/loss_simple_step", avg_loss, global_step)
+                    if cfg.log_args.log_tool == 'wandb':
+                        wandb.log({"train_loss/diffusion_loss": avg_loss}, commit=False)
 
             # Save checkpoint:
             if global_step % cfg.train.ckpt_every == 0 and global_step > 0:
@@ -161,15 +168,15 @@ def main(args) -> None:
                     torch.save(checkpoint, ckpt_path)
 
             if global_step % cfg.train.image_every == 0 or global_step == 1:
-                N = 8
-                log_clean = clean[:N]
-                log_cond = {k: v[:N] for k, v in cond.items()}
+                N = cfg.train.log_num_train_img
+                log_clean = clean[:N]                                       # b 3 512 512
+                log_cond = {k: v[:N] for k, v in cond.items()}              # 
                 log_cond_aug = {k: v[:N] for k, v in cond_aug.items()}
-                log_gt, log_lq = gt[:N], lq[:N]
+                log_gt, log_lq = gt[:N], lq[:N]                             # b  3 512 512
                 log_prompt = prompt[:N]
                 cldm.eval()
                 with torch.no_grad():
-                    z = sampler.sample(
+                    z = sampler.sample(     # b 4 64 64
                         model=cldm,
                         device=device,
                         steps=50,
@@ -179,26 +186,16 @@ def main(args) -> None:
                         cfg_scale=1.0,
                         progress=accelerator.is_main_process,
                     )
+
                     if accelerator.is_main_process:
-                        for tag, image in [
-                            ("image/samples", (pure_cldm.vae_decode(z) + 1) / 2),
-                            ("image/gt", (log_gt + 1) / 2),
-                            ("image/lq", log_lq),
-                            ("image/condition", log_clean),
-                            (
-                                "image/condition_decoded",
-                                (pure_cldm.vae_decode(log_cond["c_img"]) + 1) / 2,
-                            ),
-                            (
-                                "image/condition_aug_decoded",
-                                (pure_cldm.vae_decode(log_cond_aug["c_img"]) + 1) / 2,
-                            ),
-                            (
-                                "image/prompt",
-                                (log_txt_as_img((512, 512), log_prompt) + 1) / 2,
-                            ),
-                        ]:
-                            writer.add_image(tag, make_grid(image, nrow=4), global_step)
+                        if cfg.log_args.log_tool == 'wandb':
+                            # wandb.log({f'vis_train/gt': wandb.Image((log_gt + 1) / 2, caption=f'gt_img'),
+                            #            f'vis_train/lq': wandb.Image(log_lq, caption=f'lq_img'),
+                            #            f'vis_train/cleaned': wandb.Image(log_clean, caption=f'cleaned_img'),
+                            #            f'vis_train/sampled': wandb.Image((pure_cldm.vae_decode(z) + 1) / 2, caption=f'sampled_img'),
+                            #            f'vis_train/prompt': wandb.Image(log_txt_as_img((128, 128), log_prompt), caption=f'prompt'),
+                            #            })
+                            wandb.log({f'vis_train/lq_clean_sample_gt': wandb.Image(torch.concat([log_lq, log_clean, (pure_cldm.vae_decode(z) + 1) / 2, log_gt], dim=2), caption='lq_clean_sample,gt')})
                 cldm.train()
             accelerator.wait_for_everyone()
             if global_step == max_steps:
@@ -207,17 +204,22 @@ def main(args) -> None:
         pbar.close()
         epoch += 1
         avg_epoch_loss = (
-            accelerator.gather(torch.tensor(epoch_loss, device=device).unsqueeze(0))
-            .mean()
-            .item()
-        )
+            accelerator.gather(torch.tensor(epoch_loss, device=device).unsqueeze(0)).mean().item()
+            )
         epoch_loss.clear()
         if accelerator.is_main_process:
-            writer.add_scalar("loss/loss_simple_epoch", avg_epoch_loss, global_step)
+            if cfg.log_args.log_tool == 'tensorboard':
+                writer.add_scalar("loss/loss_simple_epoch", avg_epoch_loss, global_step)
+            elif cfg.log_args.log_tool == 'wandb':
+                pass
 
+    # print end of experiment
     if accelerator.is_main_process:
-        print("done!")
-        writer.close()
+        print("FINISH !!")
+        if args.log_args.log_tool == 'tensorboard':
+            writer.close()
+        elif args.log_args.log_tool == 'wandb':
+            pass
 
 
 if __name__ == "__main__":
