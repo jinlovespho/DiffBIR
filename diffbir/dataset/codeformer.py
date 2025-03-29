@@ -35,6 +35,7 @@ class CodeformerDataset(data.Dataset):
         jpeg_range: Sequence[int],
     ) -> "CodeformerDataset":
         super(CodeformerDataset, self).__init__()
+        breakpoint()
         self.file_list = file_list
         self.image_files = load_file_list(file_list)
         self.file_backend = instantiate_from_config(file_backend_cfg)

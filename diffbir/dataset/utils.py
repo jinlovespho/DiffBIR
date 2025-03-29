@@ -15,6 +15,7 @@ from .diffjpeg import DiffJPEG
 
 def load_file_list(file_list_path: str) -> List[Dict[str, str]]:
     files = []
+    breakpoint()
     with open(file_list_path, "r") as fin:
         for line in fin:
             path = line.strip()
