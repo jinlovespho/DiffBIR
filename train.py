@@ -137,8 +137,15 @@ def main(args):
             opt.zero_grad()
             accelerator.backward(loss)
             opt.step()
-
             accelerator.wait_for_everyone()
+
+            # log basic info
+            if accelerator.is_main_process:
+                wandb.log({
+                    'global_step': global_step,
+                    'epoch': epoch,
+                    'learning_rate': opt.param_groups[0]['lr'],
+                })
 
             global_step += 1
             step_loss.append(loss.item())
@@ -146,19 +153,18 @@ def main(args):
             pbar.update(1)
             pbar.set_description(f"Epoch: {epoch:04d}, Global Step: {global_step:07d}, Loss: {loss.item():.6f}")
 
-            # Log loss values:
-            if global_step % cfg.train.log_every == 0 and global_step > 0:
+            # Log training loss
+            if global_step % cfg.train.log_loss_every == 0 and global_step > 0:
                 # Gather values from all processes
-                avg_loss = (
+                avg_diffusion_loss = (
                     accelerator.gather(
                         torch.tensor(step_loss, device=device).unsqueeze(0)).mean().item()
                         )
                 step_loss.clear()
 
-                # log training loss
                 if accelerator.is_main_process:
                     if cfg.log_args.log_tool == 'wandb':
-                        wandb.log({"train_loss/diffusion_loss": avg_loss}, commit=False)
+                        wandb.log({"train_loss/diffusion_loss": avg_diffusion_loss})
 
             # Save checkpoint:
             if global_step % cfg.train.ckpt_every == 0 and global_step > 0:
@@ -167,10 +173,11 @@ def main(args):
                     ckpt_path = f"{ckpt_dir}/{global_step:07d}.pt"
                     torch.save(checkpoint, ckpt_path)
 
-            if global_step % cfg.train.image_every == 0 or global_step == 1:
+            # log train images
+            if global_step % cfg.train.log_image_every == 0 or global_step == 1:
                 N = cfg.train.log_num_train_img
                 log_clean = clean[:N]                                       # b 3 512 512
-                log_cond = {k: v[:N] for k, v in cond.items()}              # 
+                log_cond = {k: v[:N] for k, v in cond.items()}              
                 log_cond_aug = {k: v[:N] for k, v in cond_aug.items()}
                 log_gt, log_lq = gt[:N], lq[:N]                             # b  3 512 512
                 log_prompt = prompt[:N]
@@ -189,14 +196,62 @@ def main(args):
 
                     if accelerator.is_main_process:
                         if cfg.log_args.log_tool == 'wandb':
-                            # wandb.log({f'vis_train/gt': wandb.Image((log_gt + 1) / 2, caption=f'gt_img'),
-                            #            f'vis_train/lq': wandb.Image(log_lq, caption=f'lq_img'),
-                            #            f'vis_train/cleaned': wandb.Image(log_clean, caption=f'cleaned_img'),
-                            #            f'vis_train/sampled': wandb.Image((pure_cldm.vae_decode(z) + 1) / 2, caption=f'sampled_img'),
-                            #            f'vis_train/prompt': wandb.Image(log_txt_as_img((128, 128), log_prompt), caption=f'prompt'),
-                            #            })
-                            wandb.log({f'vis_train/lq_clean_sample_gt': wandb.Image(torch.concat([log_lq, log_clean, (pure_cldm.vae_decode(z) + 1) / 2, log_gt], dim=2), caption='lq_clean_sample,gt')})
+                            wandb.log({f'vis_train/gt': wandb.Image((log_gt + 1) / 2, caption=f'gt_img'),
+                                       f'vis_train/lq': wandb.Image(log_lq, caption=f'lq_img'),
+                                       f'vis_train/cleaned': wandb.Image(log_clean, caption=f'cleaned_img'),
+                                       f'vis_train/sampled': wandb.Image((pure_cldm.vae_decode(z) + 1) / 2, caption=f'sampled_img'),
+                                       f'vis_train/prompt': wandb.Image(log_txt_as_img((256, 256), log_prompt), caption=f'prompt'),
+                                       })
+                            wandb.log({f'vis_train/all': wandb.Image(torch.concat([log_lq, log_clean, (pure_cldm.vae_decode(z) + 1) / 2, log_gt], dim=2), caption='lq_clean_sample,gt')})
                 cldm.train()
+
+            # log validation images 
+            if global_step % cfg.val.log_image_every == 0:
+
+                for val_batch in val_loader:
+                    to(val_batch, device)
+                    val_batch = batch_transform(val_batch)
+                    val_gt, val_lq, _, val_texts, val_boxes, val_text_encs, val_img_name = val_batch 
+
+                    val_gt = rearrange(val_gt, "b h w c -> b c h w").contiguous().float()   # b 3 512 512
+                    val_lq = rearrange(val_lq, "b h w c -> b c h w").contiguous().float()
+                    val_bs, _, val_H, val_W = val_gt.shape
+
+                    # for validation we input empty prompt for now
+                    val_prompt=["" for i in range(val_bs)]
+
+                    cldm.eval()
+                    with torch.no_grad():
+                        # val_z_0 = pure_cldm.vae_encode(val_gt)
+                        val_clean = swinir(val_lq)
+                        val_cond = pure_cldm.prepare_condition(val_clean, val_prompt)
+                        # Log Validation Images
+                        M = cfg.val.log_num_val_img
+                        val_log_clean = val_clean[:M]
+                        val_log_cond = {k: v[:M] for k, v in val_cond.items()}
+                        val_log_gt, val_log_lq = val_gt[:M], val_lq[:M]
+                        val_log_prompt = val_prompt[:M]
+                        val_z = sampler.sample(     # 6 4 56 56
+                            model=cldm,
+                            device=device,
+                            steps=50,
+                            x_size=(val_bs, 4, int(val_H/8), int(val_W/8)),   # manual shape adjustment
+                            cond=val_log_cond,
+                            uncond=None,
+                            cfg_scale=1.0,
+                            progress=accelerator.is_main_process,
+                        )
+                        if accelerator.is_main_process:
+                            if cfg.log_args.log_tool == 'wandb':
+                                wandb.log({f'vis_val/gt': wandb.Image((val_log_gt + 1) / 2, caption=f'gt_img'),
+                                        f'vis_val/lq': wandb.Image(val_log_lq, caption=f'lq_img'),
+                                        f'vis_val/cleaned': wandb.Image(val_log_clean, caption=f'cleaned_img'),
+                                        f'vis_val/sampled': wandb.Image((pure_cldm.vae_decode(val_z) + 1) / 2, caption=f'sampled_img'),
+                                        f'vis_val/prompt': wandb.Image(log_txt_as_img((256, 256), val_log_prompt), caption=f'prompt'),
+                                        })
+                                wandb.log({f'vis_val/all': wandb.Image(torch.concat([val_log_lq, val_log_clean, (pure_cldm.vae_decode(val_z) + 1) / 2, val_log_gt], dim=2), caption='lq_clean_sample,gt')})
+                    cldm.train()
+
             accelerator.wait_for_everyone()
             if global_step == max_steps:
                 break
@@ -208,19 +263,12 @@ def main(args):
             )
         epoch_loss.clear()
         if accelerator.is_main_process:
-            if cfg.log_args.log_tool == 'tensorboard':
-                writer.add_scalar("loss/loss_simple_epoch", avg_epoch_loss, global_step)
-            elif cfg.log_args.log_tool == 'wandb':
-                pass
+            if cfg.log_args.log_tool == 'wandb':
+                wandb.log({"epoch_loss/epoch_diffusion_loss": avg_epoch_loss})
 
     # print end of experiment
     if accelerator.is_main_process:
         print("FINISH !!")
-        if args.log_args.log_tool == 'tensorboard':
-            writer.close()
-        elif args.log_args.log_tool == 'wandb':
-            pass
-
 
 if __name__ == "__main__":
     parser = ArgumentParser()
