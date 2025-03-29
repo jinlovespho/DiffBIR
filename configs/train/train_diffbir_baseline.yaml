@@ -1,4 +1,6 @@
 model:
+  
+  # stable diffusion unet model config
   cldm:
     target: diffbir.model.cldm.ControlLDM
     params:
@@ -66,6 +68,7 @@ model:
         context_dim: 1024
         legacy: False
 
+  # restoration module config
   swinir:
     target: diffbir.model.swinir.SwinIR
     params:
@@ -84,6 +87,7 @@ model:
       unshuffle: True
       unshuffle_scale: 8
 
+  # diffusion pipeline config
   diffusion:
     target: diffbir.model.gaussian_diffusion.Diffusion
     params:
@@ -93,27 +97,64 @@ model:
       zero_snr: False
       parameterization: eps
 
+
 dataset:
+
+  # training data config
   train:
-    target: diffbir.dataset.codeformer.CodeformerDataset
+    target: diffbir.dataset.pho_codeformer.CodeformerDataset
     params:
       # training file list path
       file_list: /media/dataset1/jinlovespho/NIPS2025/data/generated_data
       file_backend_cfg:
         target: diffbir.dataset.file_backend.HardDiskBackend
       out_size: 512
-      crop_type: center
+      crop_type: none
       blur_kernel_size: 41
       kernel_list: ['iso', 'aniso']
       kernel_prob: [0.5, 0.5]
-      blur_sigma: [0.1, 12]
-      downsample_range: [1, 12]
+      blur_sigma: [0.1, 0.5]
+      downsample_range: [4, 4]
       noise_range: [0, 15]
       jpeg_range: [30, 100]
+      # additional args
+      data_args: {
+        'mode': 'train',
+        'datasets':['TextOCR'], 
+        'ann_path':'/media/dataset1/jinlovespho/NIPS2025/data/generated_data/ocr',
+        'use_prompt':False
+        }
+  
+  # validation data config
+  val:
+    target: diffbir.dataset.pho_codeformer.CodeformerDataset
+    params:
+      # training file list path
+      file_list: /media/dataset1/jinlovespho/NIPS2025/data/generated_data
+      file_backend_cfg:
+        target: diffbir.dataset.file_backend.HardDiskBackend
+      out_size: 512
+      crop_type: none
+      blur_kernel_size: 41
+      kernel_list: ['iso', 'aniso']
+      kernel_prob: [0.5, 0.5]
+      blur_sigma: [0.1, 0.5]
+      downsample_range: [4, 4]
+      noise_range: [0, 15]
+      jpeg_range: [30, 100]
+      # additional args
+      data_args: {
+        'mode': 'val',
+        'datasets':['TextOCR'],
+        'ann_path':'/media/dataset1/jinlovespho/NIPS2025/data/generated_data/ocr',
+        'use_prompt':False
+        }
 
+    
 batch_transform:
   target: diffbir.dataset.batch_transform.IdentityBatchTransform
 
+# training args
 train:
   # pretrained sd v2.1 path
   sd_path: ./weights/v2-1_512-ema-pruned.ckpt
@@ -128,11 +169,33 @@ train:
   # batch size = 192, lr = 1e-4, total training steps = 25k
   # Our filtered laion2b-en (15M images)
   # batch size = 256, lr = 1e-4 (first 30k), 1e-5 (next 50k), total training steps = 80k
-  batch_size: 256
+  noise_aug_timestep: 0
   num_workers: 4
+  batch_size: 20
   train_steps: 30000
   log_every: 50
   ckpt_every: 10000
   image_every: 1000
   
-  noise_aug_timestep: 0
+val:
+  batch_size: 6
+  num_workers: 4
+  log_every: 100
+  image_every: 100
+
+log_args:
+  log_tool: wandba
+  wandb_key: e32eed0c2509bf898b850b0065ab62345005fb73
+  wandb_proj_name: DiffBIR_OCR_finetuning
+  wandb_exp_name: test
+
+exp_args:
+  model_name: diffbir_baseline
+  finetuning_method: only_ctrlnet
+
+  
+  
+  
+
+  
+  

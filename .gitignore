@@ -3,7 +3,6 @@ __pycache__
 *.pth
 /data
 /exps
-*.sh
 !install_env.sh
 /weights
 /temp
@@ -16,3 +15,5 @@ __pycache__
 /runs
 /tests
 /meta_files
+vis/
+wandb/

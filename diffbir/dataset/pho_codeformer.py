@@ -14,8 +14,10 @@ from .degradation import (
     random_add_gaussian_noise,
     random_add_jpg_compression,
 )
-from .utils import load_file_list, center_crop_arr, random_crop_arr
+from .pho_utils import load_file_list, center_crop_arr, random_crop_arr
 from ..utils.common import instantiate_from_config
+
+import torch 
 
 
 class CodeformerDataset(data.Dataset):
@@ -33,11 +35,15 @@ class CodeformerDataset(data.Dataset):
         downsample_range: Sequence[float],
         noise_range: Sequence[float],
         jpeg_range: Sequence[int],
+        data_args=None
     ) -> "CodeformerDataset":
         super(CodeformerDataset, self).__init__()
-        # breakpoint()
+
+        # JLP
+        self.data_args = data_args 
+
         self.file_list = file_list
-        self.image_files = load_file_list(file_list)
+        self.image_files = load_file_list(file_list, data_args)
         self.file_backend = instantiate_from_config(file_backend_cfg)
         self.out_size = out_size
         self.crop_type = crop_type
@@ -79,13 +85,20 @@ class CodeformerDataset(data.Dataset):
 
     def __getitem__(self, index: int) -> Dict[str, Union[np.ndarray, str]]:
         # load gt image
+
         img_gt = None
         while img_gt is None:
             # load meta file
             image_file = self.image_files[index]
             gt_path = image_file["image_path"]
             prompt = image_file["prompt"]
+            text = image_file["text"]
+            bbox = image_file["bbox"]
+            text_enc = image_file["text_enc"]
+            img_name = image_file['img_name']
+
             img_gt = self.load_gt_image(gt_path)
+
             if img_gt is None:
                 print(f"filed to load {gt_path}, try another image")
                 index = random.randint(0, len(self) - 1)
@@ -93,8 +106,9 @@ class CodeformerDataset(data.Dataset):
         # Shape: (h, w, c); channel order: BGR; image range: [0, 1], float32.
         img_gt = (img_gt[..., ::-1] / 255.0).astype(np.float32)
         h, w, _ = img_gt.shape
-        if np.random.uniform() < 0.5:
-            prompt = ""
+
+        # BGR to RGB, [-1, 1]
+        gt = (img_gt[..., ::-1] * 2 - 1).astype(np.float32)
 
         # ------------------------ generate lq image ------------------------ #
         # blur
@@ -128,7 +142,33 @@ class CodeformerDataset(data.Dataset):
         # BGR to RGB, [0, 1]
         lq = img_lq[..., ::-1].astype(np.float32)
 
-        return gt, lq, prompt
+        return gt, lq, prompt, text, bbox, text_enc, img_name
 
     def __len__(self) -> int:
         return len(self.image_files)
+
+
+# PHO - LOL.. this solves it! :)
+def collate_fn(batch):
+    gt, lq, _, text, bbox, text_enc, img_name = zip(*batch)
+
+    # Convert lists to tensors if possible
+    gt = torch.stack([torch.tensor(x) for x in gt])
+    lq = torch.stack([torch.tensor(x) for x in lq])
+
+    prompts=[]
+    # preprocess prompt 
+    for i in range(len(text)):
+        caption = [f'"{txt}"' for txt in text[i]]
+        prompt = f"A high-quality photo containing the word {', '.join(caption) }."
+        prompts.append(prompt)
+
+    
+    text_enc_tensor=[]
+    # preprocess text_enc
+    for i in range(len(text_enc)):
+        text_enc_tensor.append(torch.tensor(text_enc[i], dtype=torch.int32))
+
+
+    return gt, lq, list(prompts), list(text), list(bbox), list(text_enc_tensor), list(img_name)
+

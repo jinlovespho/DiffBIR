@@ -1,138 +1,116 @@
-import os
 from argparse import ArgumentParser
 import copy
-
 from omegaconf import OmegaConf
 import torch
-from torch.utils.data import DataLoader
 from torchvision.utils import make_grid
 from accelerate import Accelerator
 from accelerate.utils import set_seed
 from einops import rearrange
 from tqdm import tqdm
-from torch.utils.tensorboard import SummaryWriter
-
-from diffbir.model import ControlLDM, SwinIR, Diffusion
 from diffbir.utils.common import instantiate_from_config, to, log_txt_as_img
+from diffbir.model import ControlLDM, Diffusion
 from diffbir.sampler import SpacedSampler
-
+import initialize
+import cv2 
+import numpy as np
 
 def main(args) -> None:
-    # Setup accelerator:
+
+    # set accelerator, seed, device, config
     accelerator = Accelerator(split_batches=True)
     set_seed(231, device_specific=True)
     device = accelerator.device
     cfg = OmegaConf.load(args.config)
+    
 
-    # Setup an experiment folder:
-    if accelerator.is_main_process:
-        exp_dir = cfg.train.exp_dir
-        os.makedirs(exp_dir, exist_ok=True)
-        ckpt_dir = os.path.join(exp_dir, "checkpoints")
-        os.makedirs(ckpt_dir, exist_ok=True)
-        print(f"Experiment directory created at {exp_dir}")
+    # load logging tools and ckpt directory
+    exp_dir, ckpt_dir, writer = initialize.load_experiment_settings(accelerator, cfg)
 
-    # Create model:
-    cldm: ControlLDM = instantiate_from_config(cfg.model.cldm)
-    sd = torch.load(cfg.train.sd_path, map_location="cpu")["state_dict"]
-    unused, missing = cldm.load_pretrained_sd(sd)
-    if accelerator.is_main_process:
-        print(
-            f"strictly load pretrained SD weight from {cfg.train.sd_path}\n"
-            f"unused weights: {unused}\n"
-            f"missing weights: {missing}"
-        )
 
-    if cfg.train.resume:
-        cldm.load_controlnet_from_ckpt(torch.load(cfg.train.resume, map_location="cpu"))
-        if accelerator.is_main_process:
-            print(
-                f"strictly load controlnet weight from checkpoint: {cfg.train.resume}"
-            )
-    else:
-        init_with_new_zero, init_with_scratch = cldm.load_controlnet_from_unet()
-        if accelerator.is_main_process:
-            print(
-                f"strictly load controlnet weight from pretrained SD\n"
-                f"weights initialized with newly added zeros: {init_with_new_zero}\n"
-                f"weights initialized from scratch: {init_with_scratch}"
-            )
-
-    swinir: SwinIR = instantiate_from_config(cfg.model.swinir)
-    sd = torch.load(cfg.train.swinir_path, map_location="cpu")
-    if "state_dict" in sd:
-        sd = sd["state_dict"]
-    sd = {
-        (k[len("module.") :] if k.startswith("module.") else k): v
-        for k, v in sd.items()
-    }
-    swinir.load_state_dict(sd, strict=True)
-    for p in swinir.parameters():
-        p.requires_grad = False
-    if accelerator.is_main_process:
-        print(f"load SwinIR from {cfg.train.swinir_path}")
-
-    diffusion: Diffusion = instantiate_from_config(cfg.model.diffusion)
-
-    # Setup optimizer:
-    opt = torch.optim.AdamW(cldm.controlnet.parameters(), lr=cfg.train.learning_rate)
-
-    # Setup data:
-    dataset = instantiate_from_config(cfg.dataset.train)
-    loader = DataLoader(
-        dataset=dataset,
-        batch_size=cfg.train.batch_size,
-        num_workers=cfg.train.num_workers,
-        shuffle=True,
-        drop_last=True,
-        pin_memory=True,
-    )
-    if accelerator.is_main_process:
-        print(f"Dataset contains {len(dataset):,} images")
-
+    # load data
+    train_ds, val_ds, train_loader, val_loader = initialize.load_data(accelerator, cfg)
     batch_transform = instantiate_from_config(cfg.batch_transform)
 
-    # Prepare models for training:
-    cldm.train().to(device)
-    swinir.eval().to(device)
+
+    # load models
+    models = initialize.load_model(accelerator, device, cfg)
+    
+
+    # set training params
+    train_params = initialize.set_training_params(accelerator, models, cfg)
+
+
+    # setup optimizer
+    opt = torch.optim.AdamW(train_params, lr=cfg.train.learning_rate)
+
+
+    # setup ddpm
+    diffusion: Diffusion = instantiate_from_config(cfg.model.diffusion)
     diffusion.to(device)
-    cldm, opt, loader = accelerator.prepare(cldm, opt, loader)
-    pure_cldm: ControlLDM = accelerator.unwrap_model(cldm)
+    sampler = SpacedSampler(diffusion.betas, diffusion.parameterization, rescale_cfg=False)
+    
+
+    # setup accelerator    
+    models = {k: accelerator.prepare(v) for k, v in models.items()}
+    opt, train_loader, val_loader = accelerator.prepare(opt, train_loader, val_loader)
+
+
+    # etc
+    pure_cldm: ControlLDM = accelerator.unwrap_model(models['cldm'])
     noise_aug_timestep = cfg.train.noise_aug_timestep
 
-    # Variables for monitoring/logging purposes:
+
+    # print Training Info
+    if accelerator.is_main_process:
+        print('='*50)
+        print(f"Training steps: {cfg.train.train_steps}")
+        print(f"Experiment directory: {exp_dir}")
+        print(f"Num train_dataset: {len(train_ds):,}")
+        print(f"Num val_dataset: {len(val_ds):,}")
+        print(f'Loaded models: {list(models.keys())}')
+        print(f'Finetuning Method: {cfg.exp_args.finetuning_method}')
+        print('='*50)
+
+
+    # setup variables for monitoring/logging purposes:
     global_step = 0
     max_steps = cfg.train.train_steps
     step_loss = []
     epoch = 0
     epoch_loss = []
-    sampler = SpacedSampler(
-        diffusion.betas, diffusion.parameterization, rescale_cfg=False
-    )
-    if accelerator.is_main_process:
-        writer = SummaryWriter(exp_dir)
-        print(f"Training for {max_steps} steps...")
 
+    # Training Loop
     while global_step < max_steps:
-        pbar = tqdm(
-            iterable=None,
-            disable=not accelerator.is_main_process,
-            unit="batch",
-            total=len(loader),
-        )
-        for batch in loader:
 
-            breakpoint()
+        pbar = tqdm( iterable=None, disable=not accelerator.is_main_process, unit="batch", total=len(train_loader), )
+        for batch in train_loader:
 
             to(batch, device)
             batch = batch_transform(batch)
-            gt, lq, prompt = batch
-            gt = rearrange(gt, "b h w c -> b c h w").contiguous().float()
-            lq = rearrange(lq, "b h w c -> b c h w").contiguous().float()
+            gt, lq, prompt, texts, boxes, text_encs, img_name = batch
+
+            # # JLP - VIS BATCH IMG, BOX, TEXT
+            # for i in range(cfg.train.batch_size):
+            #     vis_gt = gt[i]
+            #     vis_lq = lq[i]
+            #     vis_gt = (vis_gt-vis_gt.min()) / (vis_gt.max()-vis_gt.min()) * 255.0
+            #     vis_lq = (vis_lq-vis_lq.min()) / (vis_lq.max()-vis_lq.min()) * 255.0 
+            #     vis_gt = vis_gt.detach().cpu().numpy().copy()
+            #     vis_lq = vis_lq.detach().cpu().numpy().copy()
+            #     # draw box and text
+            #     for box_coord, txt in zip(boxes[i], texts[i]):
+            #         x,y,w,h = box_coord 
+            #         cv2.rectangle(vis_gt, (x,y), (x+w,y+h), (0,255,0), 2)
+            #         cv2.putText(vis_gt, txt, (x,y-5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
+            #     cv2.imwrite(f'./vis/textocr_img_{i}_gt.jpg', vis_gt[...,::-1])
+            #     cv2.imwrite(f'./vis/textocr_img_{i}_lq.jpg', vis_lq[:,:,::-1])
+
+            gt = rearrange(gt, "b h w c -> b c h w").contiguous().float()   # b 3 512 512
+            lq = rearrange(lq, "b h w c -> b c h w").contiguous().float()   # b 3 512 512
 
             with torch.no_grad():
                 z_0 = pure_cldm.vae_encode(gt)
-                clean = swinir(lq)
+                clean = models['swinir'](lq)
                 cond = pure_cldm.prepare_condition(clean, prompt)
                 # noise augmentation
                 cond_aug = copy.deepcopy(cond)
@@ -159,9 +137,7 @@ def main(args) -> None:
             step_loss.append(loss.item())
             epoch_loss.append(loss.item())
             pbar.update(1)
-            pbar.set_description(
-                f"Epoch: {epoch:04d}, Global Step: {global_step:07d}, Loss: {loss.item():.6f}"
-            )
+            pbar.set_description(f"Epoch: {epoch:04d}, Global Step: {global_step:07d}, Loss: {loss.item():.6f}")
 
             # Log loss values:
             if global_step % cfg.train.log_every == 0 and global_step > 0:
