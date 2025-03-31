@@ -14,6 +14,7 @@ import initialize
 import cv2 
 import numpy as np
 import wandb
+import pyiqa
 
 
 def main(args):
@@ -41,7 +42,7 @@ def main(args):
     
 
     # set training params
-    train_params = initialize.set_training_params(accelerator, models, cfg)
+    train_params = initialize.set_training_params(models, cfg)
 
 
     # setup optimizer
@@ -66,6 +67,12 @@ def main(args):
     noise_aug_timestep = cfg.train.noise_aug_timestep
 
 
+    # SR metrics
+    metric_psnr = pyiqa.create_metric('psnr', device=device)
+    metric_ssim = pyiqa.create_metric('ssimc', device=device)
+    metric_lpips = pyiqa.create_metric('lpips', device=device)
+
+
     # print Training Info
     if accelerator.is_main_process:
         print('='*50)
@@ -85,6 +92,10 @@ def main(args):
     epoch = 0
     epoch_loss = []
 
+    # train_psnr=0.0
+    # train_ssim=0.0
+    # train_lpips=0.0
+
 
     # Training Loop
     while global_step < max_steps:
@@ -95,6 +106,7 @@ def main(args):
             to(batch, device)
             batch = batch_transform(batch)
             gt, lq, prompt, texts, boxes, text_encs, img_name = batch
+            bs = gt.shape[0]
 
             # # JLP - VIS BATCH IMG, BOX, TEXT
             # for i in range(cfg.train.batch_size):
@@ -114,6 +126,9 @@ def main(args):
 
             gt = rearrange(gt, "b h w c -> b c h w").contiguous().float()   # b 3 512 512
             lq = rearrange(lq, "b h w c -> b c h w").contiguous().float()   # b 3 512 512
+
+            # no prompt for training as well
+            prompt=["" for i in range(bs)]
 
             with torch.no_grad():
                 z_0 = pure_cldm.vae_encode(gt)  # b 4 64 64
@@ -169,12 +184,20 @@ def main(args):
             # Save checkpoint:
             if global_step % cfg.train.ckpt_every == 0 and global_step > 0:
                 if accelerator.is_main_process:
-                    checkpoint = pure_cldm.controlnet.state_dict()
-                    ckpt_path = f"{ckpt_dir}/{global_step:07d}.pt"
-                    torch.save(checkpoint, ckpt_path)
+                    
+                    # save only controlnet 
+                    if cfg.exp_args.finetuning_method == 'only_ctrlnet':
+                        ckpt = pure_cldm.controlnet.state_dict()
+                    elif cfg.exp_args.finetuning_method == 'asdf':
+                        # ckpt = other_models 
+                        pass
+                    
+                    ckpt_path = f"{ckpt_dir}/{cfg.exp_args.finetuning_method}_{global_step:07d}.pt"
+                    torch.save(ckpt, ckpt_path)
 
             # log train images
             if global_step % cfg.train.log_image_every == 0 or global_step == 1:
+                print(f'Logging Training Metric and Images')
                 N = cfg.train.log_num_train_img
                 log_clean = clean[:N]                                       # b 3 512 512
                 log_cond = {k: v[:N] for k, v in cond.items()}              
@@ -194,8 +217,36 @@ def main(args):
                         progress=accelerator.is_main_process,
                     )
 
+                    ## I dont think we have to log total psnr, ssim, lpips for training..
+                    # train_psnr += torch.mean(metric_psnr(torch.clamp((pure_cldm.vae_decode(z) + 1) / 2, min=0, max=1),torch.clamp((log_gt + 1) / 2, min=0, max=1))).item()
+                    # train_ssim += torch.mean(metric_ssim(torch.clamp((pure_cldm.vae_decode(z) + 1) / 2, min=0, max=1),torch.clamp((log_gt + 1) / 2, min=0, max=1))).item()
+                    # train_lpips += torch.mean(metric_lpips(torch.clamp((pure_cldm.vae_decode(z) + 1) / 2, min=0, max=1),torch.clamp((log_gt + 1) / 2, min=0, max=1))).item()
+                    
+                    # log to wandb
                     if accelerator.is_main_process:
                         if cfg.log_args.log_tool == 'wandb':
+
+                            # log metrics 
+                            wandb.log({f'metric_train/train_psnr': torch.mean(
+                                                                metric_psnr(
+                                                                    torch.clamp((pure_cldm.vae_decode(z) + 1) / 2, min=0, max=1),
+                                                                    torch.clamp((log_gt + 1) / 2, min=0, max=1))
+                                                                ).item(),
+
+                                       f'metric_train/train_ssim': torch.mean(
+                                                                metric_ssim(
+                                                                    torch.clamp((pure_cldm.vae_decode(z) + 1) / 2, min=0, max=1),
+                                                                    torch.clamp((log_gt + 1) / 2, min=0, max=1))
+                                                                ).item(),
+
+                                       f'metric_train/train_lpips': torch.mean(
+                                                                metric_lpips(
+                                                                    torch.clamp((pure_cldm.vae_decode(z) + 1) / 2, min=0, max=1),
+                                                                    torch.clamp((log_gt + 1) / 2, min=0, max=1))
+                                                                ).item(),
+                                    })
+
+                            # log train images
                             wandb.log({f'vis_train/gt': wandb.Image((log_gt + 1) / 2, caption=f'gt_img'),
                                        f'vis_train/lq': wandb.Image(log_lq, caption=f'lq_img'),
                                        f'vis_train/cleaned': wandb.Image(log_clean, caption=f'cleaned_img'),
@@ -206,7 +257,12 @@ def main(args):
                 cldm.train()
 
             # log validation images 
-            if global_step % cfg.val.log_image_every == 0:
+            if global_step % cfg.val.log_image_every == 0 or global_step == 1:
+                print(f'Logging Validation Metric and Images')
+
+                tot_val_psnr=0.0
+                tot_val_ssim=0.0
+                tot_val_lpips=0.0
 
                 for val_batch in val_loader:
                     to(val_batch, device)
@@ -241,8 +297,37 @@ def main(args):
                             cfg_scale=1.0,
                             progress=accelerator.is_main_process,
                         )
+
+                        # for validation, we should log total psnr, ssim, lpips for all validation data
+                        tot_val_psnr += torch.mean(metric_psnr(torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, min=0, max=1),torch.clamp((val_log_gt + 1) / 2, min=0, max=1))).item()
+                        tot_val_ssim += torch.mean(metric_ssim(torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, min=0, max=1),torch.clamp((val_log_gt + 1) / 2, min=0, max=1))).item()
+                        tot_val_lpips += torch.mean(metric_lpips(torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, min=0, max=1),torch.clamp((val_log_gt + 1) / 2, min=0, max=1))).item()
+
+
+                        # log validation imgs to wandb
                         if accelerator.is_main_process:
                             if cfg.log_args.log_tool == 'wandb':
+                                # log val metrics 
+                                wandb.log({f'metric_val/val_psnr': torch.mean(
+                                                                    metric_psnr(
+                                                                        torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, min=0, max=1),
+                                                                        torch.clamp((val_log_gt + 1) / 2, min=0, max=1))
+                                                                    ).item(),
+
+                                        f'metric_val/val_ssim': torch.mean(
+                                                                    metric_ssim(
+                                                                        torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, min=0, max=1),
+                                                                        torch.clamp((val_log_gt + 1) / 2, min=0, max=1))
+                                                                    ).item(),
+
+                                        f'metric_val/val_lpips': torch.mean(
+                                                                    metric_lpips(
+                                                                        torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, min=0, max=1),
+                                                                        torch.clamp((val_log_gt + 1) / 2, min=0, max=1))
+                                                                    ).item(),
+                                        })
+
+                                # log val images 
                                 wandb.log({f'vis_val/gt': wandb.Image((val_log_gt + 1) / 2, caption=f'gt_img'),
                                         f'vis_val/lq': wandb.Image(val_log_lq, caption=f'lq_img'),
                                         f'vis_val/cleaned': wandb.Image(val_log_clean, caption=f'cleaned_img'),
@@ -251,6 +336,18 @@ def main(args):
                                         })
                                 wandb.log({f'vis_val/all': wandb.Image(torch.concat([val_log_lq, val_log_clean, (pure_cldm.vae_decode(val_z) + 1) / 2, val_log_gt], dim=2), caption='lq_clean_sample,gt')})
                     cldm.train()
+                
+
+                # log total val metrics 
+                if accelerator.is_main_process:
+                    if cfg.log_args.log_tool == 'wandb':
+                        wandb.log({
+                            f'metric_val/tot_val_psnr': tot_val_psnr,
+                            f'metric_val/tot_val_ssim': tot_val_ssim,
+                            f'metric_val/tot_val_lpips': tot_val_lpips,
+                        })
+
+
 
             accelerator.wait_for_everyone()
             if global_step == max_steps:

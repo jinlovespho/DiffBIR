@@ -117,7 +117,7 @@ def load_model(accelerator, device, cfg):
     return loaded_models
 
 
-def set_training_params(accelerator, models, cfg):
+def set_training_params(models, cfg):
 
     train_params=[]
 

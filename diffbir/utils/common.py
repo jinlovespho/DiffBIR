@@ -11,6 +11,8 @@ from tqdm import tqdm
 from PIL import Image, ImageDraw, ImageFont
 from torch.hub import download_url_to_file, get_dir
 
+import cv2 
+
 
 def get_obj_from_str(string: str, reload: bool = False) -> Any:
     module, cls = string.rsplit(".", 1)

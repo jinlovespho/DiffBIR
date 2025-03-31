@@ -127,7 +127,7 @@ def load_file_list(file_list_path: str, data_args=None):
                               "img_name": img_name})
 
     if mode=='val':
-        files = random.sample(files, 16)
+        files = random.sample(files, 24)
     return files
 
 
