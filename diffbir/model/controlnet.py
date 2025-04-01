@@ -24,10 +24,14 @@ class ControlledUnetModel(UNetModel):
         only_mid_control=False,
         **kwargs,
     ):
+        
+        extracted_feats=[]
+
         hs = []
         t_emb = timestep_embedding(timesteps, self.model_channels, repeat_only=False)
         emb = self.time_embed(t_emb)
         h, emb, context = map(lambda t: t.type(self.dtype), (x, emb, context))
+        # self.input_blocks: 0 / 123 / 456 / 789 / 1011
         for module in self.input_blocks:
             h = module(h, emb, context)
             hs.append(h)
@@ -36,15 +40,20 @@ class ControlledUnetModel(UNetModel):
         if control is not None:
             h += control.pop()
 
+        # self.output_blocks: 012 / 345 / 678 / 91011
+        extract_idx = [2, 5, 8, 11]
         for i, module in enumerate(self.output_blocks):
             if only_mid_control or control is None:
                 h = torch.cat([h, hs.pop()], dim=1)
             else:
                 h = torch.cat([h, hs.pop() + control.pop()], dim=1)
             h = module(h, emb, context)
+            # JLP - extract feat
+            if i in extract_idx:
+                extracted_feats.append(h.detach())
 
         h = h.type(x.dtype)
-        return self.out(h)
+        return self.out(h), extracted_feats
 
 
 class ControlNet(nn.Module):

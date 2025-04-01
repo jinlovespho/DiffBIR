@@ -65,6 +65,8 @@ def load_file_list(file_list_path: str, data_args=None):
                 img_id = img_name.split('/')[-1].split('_')[0]
                 crop_id = img_name.split('/')[-1].split('_')[-1].split('.')[0]
                 ann = json_data[img_id][crop_id]
+
+                model_H, model_W = data_args['model_img_size']
                 
                 boxes=[]
                 texts=[]
@@ -88,9 +90,31 @@ def load_file_list(file_list_path: str, data_args=None):
                         text_encs.append(encode(text))
 
                         # box preprocess
-                        box=ann[i]['bbox']
-                        box = list(map(lambda x: int(x),box))
-                        boxes.append(box)
+                        box_xywh=ann[i]['bbox']
+                        x,y,w,h = box_xywh
+
+                        # process box xywh -> xyxy
+                        box_xyxy = [x, y, x+w, y+h] 
+                        
+                        # scale the box to [0,1]
+                        box_xyxy_scaled = list(map(lambda x: x/model_H, box_xyxy))
+
+                        # process box xyxy->cxcywh
+                        x1,y1,x2,y2 = box_xyxy_scaled 
+                        box_cxcywh = [(x1+x2)/2, (y1+y2)/2, x2-x1, y2-y1]
+
+                        # select box format
+                        if data_args['bbox_format'] == 'xywh_unscaled':
+                            processed_box = box_xywh
+                            processed_box = list(map(lambda x: int(x), processed_box))
+                        elif data_args['bbox_format'] == 'xyxy_scaled':
+                            processed_box = box_xyxy_scaled
+                            processed_box = list(map(lambda x: round(x,4), processed_box))
+                        elif data_args['bbox_format'] == 'cxcywh_scaled':
+                            processed_box = box_cxcywh
+                            processed_box = list(map(lambda x: round(x,4), processed_box))
+                        
+                        boxes.append(processed_box)
 
                         # prompt preprocess
                         # prompt=f'A high-quality photo containing the word "{text}"'

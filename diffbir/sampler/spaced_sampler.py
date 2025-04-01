@@ -96,9 +96,17 @@ class SpacedSampler(Sampler):
         posterior_variance = (
             betas * (1.0 - alphas_cumprod_prev) / (1.0 - alphas_cumprod)
         )
-        posterior_log_variance_clipped = np.log(
-            np.append(posterior_variance[1], posterior_variance[1:])
-        )
+        # posterior_log_variance_clipped = np.log(
+        #     np.append(posterior_variance[1], posterior_variance[1:])
+        # )
+        if len(posterior_variance) > 1:
+            posterior_log_variance_clipped = np.log(
+                np.append(posterior_variance[1], posterior_variance[1:])
+            )
+        else:
+            posterior_log_variance_clipped = np.log(
+                np.append(posterior_variance[0], posterior_variance[0])
+            )
         posterior_mean_coef1 = (
             betas * np.sqrt(alphas_cumprod_prev) / (1.0 - alphas_cumprod)
         )
@@ -170,7 +178,7 @@ class SpacedSampler(Sampler):
         cfg_scale: float,
     ) -> torch.Tensor:
         # predict x_0
-        model_output = self.apply_model(model, x, model_t, cond, uncond, cfg_scale)
+        model_output, extracted_feats = self.apply_model(model, x, model_t, cond, uncond, cfg_scale)
         if self.parameterization == "eps":
             pred_x0 = self._predict_xstart_from_eps(x, t, model_output)
         else:
@@ -181,7 +189,7 @@ class SpacedSampler(Sampler):
         noise = torch.randn_like(x)
         nonzero_mask = (t != 0).float().view(-1, *([1] * (len(x.shape) - 1)))
         x_prev = mean + nonzero_mask * torch.sqrt(variance) * noise
-        return x_prev
+        return x_prev, extracted_feats
 
     @torch.no_grad()
     def sample(
@@ -198,10 +206,12 @@ class SpacedSampler(Sampler):
         tile_stride: int = -1,
         x_T: torch.Tensor | None = None,
         progress: bool = True,
+        cfg=None
     ) -> torch.Tensor:
+
         self.make_schedule(steps)
         self.to(device)
-        if tiled:
+        if tiled:   # f
             forward = model.forward
             model.forward = make_tiled_fn(
                 lambda x_tile, t, cond, hi, hi_end, wi, wi_end: (
@@ -217,7 +227,7 @@ class SpacedSampler(Sampler):
                 tile_size,
                 tile_stride,
             )
-        if x_T is None:
+        if x_T is None: # t
             x_T = torch.randn(x_size, device=device, dtype=torch.float32)
 
         x = x_T
@@ -226,11 +236,15 @@ class SpacedSampler(Sampler):
         iterator = tqdm(timesteps, total=total_steps, disable=not progress)
         bs = x_size[0]
 
-        for i, step in enumerate(iterator):
-            model_t = torch.full((bs,), step, device=device, dtype=torch.long)
+        sampling_steps = cfg.exp_args['unet_feat_sampling_timestep']
+        sampled_unet_feats = []
+
+        for i, current_timestep in enumerate(iterator):
+            # print(i, timestep)
+            model_t = torch.full((bs,), current_timestep, device=device, dtype=torch.long)
             t = torch.full((bs,), total_steps - i - 1, device=device, dtype=torch.long)
-            cur_cfg_scale = self.get_cfg_scale(cfg_scale, step)
-            x = self.p_sample(
+            cur_cfg_scale = self.get_cfg_scale(cfg_scale, current_timestep)
+            x, extracted_feats = self.p_sample(
                 model,
                 x,
                 model_t,
@@ -240,6 +254,10 @@ class SpacedSampler(Sampler):
                 cur_cfg_scale,
             )
 
-        if tiled:
+            # JLP 
+            if i+1 in sampling_steps:
+                sampled_unet_feats.append( (i+1, current_timestep, extracted_feats) )
+
+        if tiled:   # f
             model.forward = forward
-        return x
+        return x, sampled_unet_feats 

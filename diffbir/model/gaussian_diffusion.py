@@ -121,10 +121,10 @@ class Diffusion(nn.Module):
     def register(self, name: str, value: np.ndarray) -> None:
         self.register_buffer(name, torch.tensor(value, dtype=torch.float32))
 
-    def q_sample(self, x_start, t, noise):
+    def q_sample(self, z_0, t, noise):
         return (
-            extract_into_tensor(self.sqrt_alphas_cumprod, t, x_start.shape) * x_start
-            + extract_into_tensor(self.sqrt_one_minus_alphas_cumprod, t, x_start.shape)
+            extract_into_tensor(self.sqrt_alphas_cumprod, t, z_0.shape) * z_0
+            + extract_into_tensor(self.sqrt_one_minus_alphas_cumprod, t, z_0.shape)
             * noise
         )
 
@@ -148,20 +148,42 @@ class Diffusion(nn.Module):
             raise NotImplementedError("unknown loss type '{loss_type}'")
 
         return loss
-
-    def p_losses(self, model, x_start, t, cond):
-        noise = torch.randn_like(x_start)
-        x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
-        model_output = model(x_noisy, t, cond)
+    
+    def inference_sample(self, model, z_0, t, cond):
+        noise = torch.randn_like(z_0)
+        z_t = self.q_sample(z_0=z_0, t=t, noise=noise)
+        model_output, extracted_feats = model(z_t, t, cond)
 
         if self.parameterization == "x0":
-            target = x_start
+            target = z_0
         elif self.parameterization == "eps":
             target = noise
         elif self.parameterization == "v":
-            target = self.get_v(x_start, noise, t)
+            target = self.get_v(z_0, noise, t)
         else:
             raise NotImplementedError()
 
+        # pred_z_0 = self.pred_x_start_from_eps(z_t, t, model_output) # obtain pred_x0 from predicted noise
         loss_simple = self.get_loss(model_output, target, mean=False).mean()
-        return loss_simple
+        
+        return loss_simple, extracted_feats 
+        
+
+    def p_losses(self, model, z_0, t, cond):
+        noise = torch.randn_like(z_0)
+        z_t = self.q_sample(z_0=z_0, t=t, noise=noise)
+        model_output, extracted_feats = model(z_t, t, cond)
+
+        if self.parameterization == "x0":
+            target = z_0
+        elif self.parameterization == "eps":
+            target = noise
+        elif self.parameterization == "v":
+            target = self.get_v(z_0, noise, t)
+        else:
+            raise NotImplementedError()
+
+        # pred_z_0 = self.pred_x_start_from_eps(z_t, t, model_output) # obtain pred_x0 from predicted noise
+        loss_simple = self.get_loss(model_output, target, mean=False).mean()
+        
+        return loss_simple, extracted_feats 

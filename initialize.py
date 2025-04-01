@@ -1,4 +1,5 @@
 import os 
+import sys
 import wandb 
 import argparse
 from omegaconf import OmegaConf
@@ -62,88 +63,138 @@ def load_data(accelerator, cfg):
 
 
 
-def load_model(accelerator, device, cfg):
+def load_model(accelerator, device, args, cfg):
 
     loaded_models={}
 
-    if cfg.exp_args.model_name == 'diffbir_baseline':
+    # default: load cldm, swinir
+    cldm: ControlLDM = instantiate_from_config(cfg.model.cldm)
+    sd = torch.load(cfg.train.sd_path, map_location="cpu")["state_dict"]
+    unused, missing = cldm.load_pretrained_sd(sd)
+    if accelerator.is_main_process:
+        print(
+            f"strictly load pretrained SD weight from {cfg.train.sd_path}\n"
+            f"unused weights: {unused}\n"
+            f"missing weights: {missing}"
+        )
 
-        cldm: ControlLDM = instantiate_from_config(cfg.model.cldm)
-        sd = torch.load(cfg.train.sd_path, map_location="cpu")["state_dict"]
-        unused, missing = cldm.load_pretrained_sd(sd)
+    if cfg.train.resume:
+        cldm.load_controlnet_from_ckpt(torch.load(cfg.train.resume, map_location="cpu"))
         if accelerator.is_main_process:
             print(
-                f"strictly load pretrained SD weight from {cfg.train.sd_path}\n"
-                f"unused weights: {unused}\n"
-                f"missing weights: {missing}"
+                f"strictly load controlnet weight from checkpoint: {cfg.train.resume}"
+            )
+    else:
+        init_with_new_zero, init_with_scratch = cldm.load_controlnet_from_unet()
+        if accelerator.is_main_process:
+            print(
+                f"strictly load controlnet weight from pretrained SD\n"
+                f"weights initialized with newly added zeros: {init_with_new_zero}\n"
+                f"weights initialized from scratch: {init_with_scratch}"
             )
 
-        if cfg.train.resume:
-            cldm.load_controlnet_from_ckpt(torch.load(cfg.train.resume, map_location="cpu"))
-            if accelerator.is_main_process:
-                print(
-                    f"strictly load controlnet weight from checkpoint: {cfg.train.resume}"
-                )
-        else:
-            init_with_new_zero, init_with_scratch = cldm.load_controlnet_from_unet()
-            if accelerator.is_main_process:
-                print(
-                    f"strictly load controlnet weight from pretrained SD\n"
-                    f"weights initialized with newly added zeros: {init_with_new_zero}\n"
-                    f"weights initialized from scratch: {init_with_scratch}"
-                )
+    swinir: SwinIR = instantiate_from_config(cfg.model.swinir)
+    sd = torch.load(cfg.train.swinir_path, map_location="cpu")
+    if "state_dict" in sd:
+        sd = sd["state_dict"]
+    sd = {
+        (k[len("module.") :] if k.startswith("module.") else k): v
+        for k, v in sd.items()
+    }
+    swinir.load_state_dict(sd, strict=True)
+    for p in swinir.parameters():
+        p.requires_grad = False
+    if accelerator.is_main_process:
+        print(f"load SwinIR from {cfg.train.swinir_path}")
 
-        swinir: SwinIR = instantiate_from_config(cfg.model.swinir)
-        sd = torch.load(cfg.train.swinir_path, map_location="cpu")
-        if "state_dict" in sd:
-            sd = sd["state_dict"]
-        sd = {
-            (k[len("module.") :] if k.startswith("module.") else k): v
-            for k, v in sd.items()
-        }
-        swinir.load_state_dict(sd, strict=True)
-        for p in swinir.parameters():
-            p.requires_grad = False
-        if accelerator.is_main_process:
-            print(f"load SwinIR from {cfg.train.swinir_path}")
-
-        # set mode and cuda
-        loaded_models['cldm'] = cldm.train().to(device)
-        loaded_models['swinir'] = swinir.eval().to(device)
+    # set mode and cuda
+    loaded_models['cldm'] = cldm.train().to(device)
+    loaded_models['swinir'] = swinir.eval().to(device)
     
+
+    # ------------------------ ADD MODELS -------------------------------
+
+    # training ocr detection with diffbir features
+    if cfg.exp_args.model_name == 'diffbir_onlybox':
+        sys.path.append('/media/dataset1/jinlovespho/NIPS2025/DiffBIR/testr')
+        from testr.adet.modeling.transformer_detector import TransformerDetector
+        from testr.adet.config import get_cfg
+
+        # get testr config
+        config_testr = get_cfg()
+        config_testr.merge_from_file(args.config_testr)
+        config_testr.freeze()
+
+        detector = TransformerDetector(config_testr)
+        loaded_models['testr_detector'] = detector.train().to(device)
+    
+    # add other models
     elif cfg.exp_args.model_name == '':
         pass
+
 
     return loaded_models
 
 
-def set_training_params(models, cfg):
+def set_training_params(accelerator, models, cfg):
 
     train_params=[]
+    all_model_names=[]
+    train_model_names=[]
 
     for model_name, model in models.items():
 
         for name, param in model.named_parameters():
+            all_model_names.append(name)
+
 
             if cfg.exp_args.finetuning_method == 'full_finetuning':
                 param.requires_grad = True 
+                train_model_names.append(name)
                 train_params.append(param)
+
 
             elif cfg.exp_args.finetuning_method == 'only_ctrlnet':
                 if 'controlnet' in name:
                     param.requires_grad = True
+                    train_model_names.append(name)
                     train_params.append(param)
                 else: 
                     param.requires_grad = False
 
+
             elif cfg.exp_args.finetuning_method == 'only_unet':
                 if 'unet' in name:
                     param.requires_grad = True
+                    train_model_names.append(name)
                     train_params.append(param)
                 else: 
                     param.requires_grad = False
+            
+            
+            elif cfg.exp_args.finetuning_method == 'only_testr_detector':
+                if 'testr.transformer.encoder' in name or 'testr.transformer.level_embed' in name:
+                    param.requires_grad = True
+                    train_model_names.append(name)
+                    train_params.append(param)
+                else:
+                    param.requires_grad = False
+
+
+            elif cfg.exp_args.finetuning_method == 'ctrlnet_and_only_testr_detector':
+                if 'controlnet' in name or 'testr.transformer.encoder' in name or 'testr.transformer.level_embed' in name:
+                    param.requires_grad = True
+                    train_model_names.append(name)
+                    train_params.append(param)
+                else:
+                    param.requires_grad = False
+
+    # print modules to be trained
+    if accelerator.is_main_process:
+        print('================================== MODELS TO BE TRAINED ==================================')
+        print(train_model_names)
         
-    return train_params
+    return train_params, train_model_names
 
 
 
