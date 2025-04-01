@@ -248,16 +248,16 @@ def main(args):
                         wandb.log({"train_loss/total_globalstep_loss": avg_globalstep_total_loss})
 
 
-
             # ======================== SAVE MODEL ========================
             if global_step % cfg.train.ckpt_every == 0 and global_step > 0:
                 if accelerator.is_main_process:
-                    # save only controlnet 
-                    if cfg.exp_args.finetuning_method == 'only_ctrlnet':
-                        ckpt = pure_cldm.controlnet.state_dict()
-                    elif cfg.exp_args.finetuning_method == 'asdf':
-                        # ckpt = other_models 
-                        pass
+                    ckpt = {}
+
+                    # Unwrap models before saving their state_dicts
+                    for model_name, model in models.items():
+                        unwrapped_model = accelerator.unwrap_model(model)
+                        ckpt[model_name] = unwrapped_model.state_dict()
+
                     ckpt_path = f"{ckpt_dir}/{cfg.exp_args.finetuning_method}_{global_step:07d}.pt"
                     torch.save(ckpt, ckpt_path)
             # =============================================================

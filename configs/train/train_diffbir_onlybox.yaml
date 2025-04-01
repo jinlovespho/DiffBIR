@@ -176,26 +176,24 @@ train:
   num_workers: 4
   train_steps: 30000
   ckpt_every: 10000
-  log_loss_every: 30
-  log_image_every: 300
+  log_loss_every: 50
+  log_image_every: 500
   batch_size: 4
   log_num_train_img: 4
   learning_rate: 1e-4
   # experiment directory path
-  exp_dir: ./results/pho_server5_gpu0_diffbir_onlybox_FTctrlnetAndOnlyTestrDetector_bs4_lr1e-4_noprompt
-  
+  exp_dir: ./results/pho_server5_gpu0_diffbir_onlybox_FTctrlnet_and_only_testr_detector_bs4_lr1e-4_noprompt
 val:
   num_workers: 4
   batch_size: 6
   log_num_val_img: 6
-  log_image_every: 300
+  log_image_every: 500
 
 log_args:
   log_tool: wandb
   wandb_key: e32eed0c2509bf898b850b0065ab62345005fb73
   wandb_proj_name: DiffBIR_OCR_finetuning
-  # pho_server5_gpu1_diffbir_onlybox_FTonlyTestrDetector_bs4_lr1e-4_noprompt
-  wandb_exp_name: pho_server5_gpu0_diffbir_onlybox_FTctrlnetAndOnlyTestrDetector_bs4_lr1e-4_noprompt
+  wandb_exp_name: pho_server5_gpu0_diffbir_onlybox_FTctrlnet_and_only_testr_detector_bs4_lr1e-4_noprompt
 
 exp_args:
   model_name: diffbir_onlybox

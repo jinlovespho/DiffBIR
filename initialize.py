@@ -192,7 +192,9 @@ def set_training_params(accelerator, models, cfg):
     # print modules to be trained
     if accelerator.is_main_process:
         print('================================== MODELS TO BE TRAINED ==================================')
-        print(train_model_names)
+        chunk_size = 10  # Adjust based on readability
+        for i in range(0, len(train_model_names), chunk_size):
+            print(train_model_names[i:i+chunk_size])  # Print in smaller chunks
         
     return train_params, train_model_names
 
