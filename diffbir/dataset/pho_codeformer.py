@@ -96,6 +96,8 @@ class CodeformerDataset(data.Dataset):
             bbox = image_file["bbox"]
             text_enc = image_file["text_enc"]
             img_name = image_file['img_name']
+            poly = image_file.get('poly')
+
 
             img_gt = self.load_gt_image(gt_path)
 
@@ -142,7 +144,7 @@ class CodeformerDataset(data.Dataset):
         # BGR to RGB, [0, 1]
         lq = img_lq[..., ::-1].astype(np.float32)
 
-        return gt, lq, prompt, text, bbox, text_enc, img_name
+        return gt, lq, prompt, text, bbox, poly, text_enc, img_name
 
     def __len__(self) -> int:
         return len(self.image_files)
@@ -150,7 +152,8 @@ class CodeformerDataset(data.Dataset):
 
 # PHO - LOL.. this solves it! :)
 def collate_fn(batch):
-    gt, lq, _, text, bbox, text_enc, img_name = zip(*batch)
+
+    gt, lq, _, text, bbox, poly, text_enc, img_name = zip(*batch)
 
     # Convert lists to tensors if possible
     gt = torch.stack([torch.tensor(x) for x in gt])
@@ -170,5 +173,11 @@ def collate_fn(batch):
         text_enc_tensor.append(torch.tensor(text_enc[i], dtype=torch.int32))
 
 
-    return gt, lq, list(prompts), list(text), list(bbox), list(text_enc_tensor), list(img_name)
+    poly_tensor=[]
+    # process poly
+    for i in range(len(poly)):
+        poly_tensor.append(torch.tensor(poly[i], dtype=torch.float32))
+        
+
+    return gt, lq, list(prompts), list(text), list(bbox), list(poly_tensor), list(text_enc_tensor), list(img_name)
 

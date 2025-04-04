@@ -12,12 +12,14 @@ from diffbir.utils.common import instantiate_from_config, to, log_txt_as_img
 from diffbir.model import ControlLDM, Diffusion
 from diffbir.sampler import SpacedSampler
 import initialize
+import os
 import cv2 
 import numpy as np
 import wandb
 import pyiqa
 from torchvision.utils import save_image 
 from torchvision.transforms.functional import to_pil_image
+from diffbir.dataset.pho_utils import encode, decode 
 
 
 def main(args):
@@ -28,7 +30,7 @@ def main(args):
     set_seed(231, device_specific=True)
     device = accelerator.device
     cfg = OmegaConf.load(args.config)
-    
+
 
     # load logging tools and ckpt directory
     if accelerator.is_main_process:
@@ -96,10 +98,11 @@ def main(args):
     epoch_total_loss = []
 
     diffusion_loss = []
+    ocr_losses={}
 
-    ocr_enc_cls_loss=[]
-    ocr_enc_box_loss=[]
-    ocr_enc_giou_loss=[]
+    # ocr_enc_cls_loss=[]
+    # ocr_enc_box_loss=[]
+    # ocr_enc_giou_loss=[]
 
     # train_psnr=0.0
     # train_ssim=0.0
@@ -122,7 +125,7 @@ def main(args):
             # load training data
             to(batch, device)
             batch = batch_transform(batch)
-            gt, lq, train_prompt, texts, boxes, text_encs, img_name = batch
+            gt, lq, train_prompt, texts, boxes, polys, text_encs, img_name = batch
             gt = rearrange(gt, "b h w c -> b c h w").contiguous().float()   # b 3 512 512
             lq = rearrange(lq, "b h w c -> b c h w").contiguous().float()   # b 3 512 512
             train_bs = gt.shape[0]
@@ -166,7 +169,7 @@ def main(args):
             
 
             # =========================== OCR ===========================
-            if cfg.exp_args.model_name == 'diffbir_onlybox':
+            if cfg.exp_args.model_name == 'diffbir_onlybox' or cfg.exp_args.model_name == 'diffbir_testr':
 
                 # process annotations for OCR training loss
                 train_targets=[]
@@ -176,18 +179,30 @@ def main(args):
                     tmp_dict['labels'] = torch.tensor([0]*num_box).cuda()  # 0 for text
                     tmp_dict['boxes'] = torch.tensor(boxes[i]).cuda()
                     tmp_dict['texts'] = text_encs[i]
+                    tmp_dict['ctrl_points'] = polys[i]
                     train_targets.append(tmp_dict)
 
 
                 # OCR model forward pass
                 ocr_loss_dict, _ = models['testr_detector'](extracted_feats, train_targets)
 
+                # OCR total_loss
+                ocr_tot_loss = sum(ocr_loss_dict.values())
 
-                # OCR loss
-                ocr_loss = sum(ocr_loss_dict.values())
-                ocr_enc_cls = ocr_loss_dict['loss_ce_enc']
-                ocr_enc_box = ocr_loss_dict['loss_bbox_enc']
-                ocr_enc_giou = ocr_loss_dict['loss_giou_enc']
+                # OCR losses
+                for ocr_key, ocr_val in ocr_loss_dict.items():
+                    if ocr_key in ocr_losses.keys():
+                        ocr_losses[ocr_key].append(ocr_val.item())
+                    else:
+                        ocr_losses[ocr_key]=[ocr_val.item()]
+
+
+
+
+
+                # ocr_enc_cls = ocr_loss_dict['loss_ce_enc']
+                # ocr_enc_box = ocr_loss_dict['loss_bbox_enc']
+                # ocr_enc_giou = ocr_loss_dict['loss_giou_enc']
 
                 # print(f'loss_ocr_enc_cls: {ocr_enc_cls.item():.3f}')
                 # print(f'loss_ocr_enc_box: {ocr_enc_box.item():.3f}')
@@ -199,7 +214,7 @@ def main(args):
 
 
             # TOTAL LOSS FUNCTION
-            total_loss = diff_loss + ocr_loss
+            total_loss = diff_loss + ocr_tot_loss
 
 
             # calculate gradient and update model
@@ -212,9 +227,9 @@ def main(args):
 
             # gather losses for logging
             diffusion_loss.append(diff_loss.item())
-            ocr_enc_cls_loss.append(ocr_enc_cls.item())
-            ocr_enc_box_loss.append(ocr_enc_box.item())
-            ocr_enc_giou_loss.append(ocr_enc_giou.item())
+            # ocr_enc_cls_loss.append(ocr_enc_cls.item())
+            # ocr_enc_box_loss.append(ocr_enc_box.item())
+            # ocr_enc_giou_loss.append(ocr_enc_giou.item())
             globalstep_total_loss.append(total_loss.item())
             epoch_total_loss.append(total_loss.item())
 
@@ -228,23 +243,28 @@ def main(args):
             if global_step % cfg.train.log_loss_every == 0 and global_step > 0:
                 # Gather values from all processes
                 avg_diffusion_loss = (accelerator.gather(torch.tensor(diffusion_loss, device=device).unsqueeze(0)).mean().item())
-                avg_ocr_enc_cls_loss = (accelerator.gather(torch.tensor(ocr_enc_cls_loss, device=device).unsqueeze(0)).mean().item())
-                avg_ocr_enc_box_loss = (accelerator.gather(torch.tensor(ocr_enc_box_loss, device=device).unsqueeze(0)).mean().item())
-                avg_ocr_enc_giou_loss = (accelerator.gather(torch.tensor(ocr_enc_giou_loss, device=device).unsqueeze(0)).mean().item())
+                # avg_ocr_enc_cls_loss = (accelerator.gather(torch.tensor(ocr_enc_cls_loss, device=device).unsqueeze(0)).mean().item())
+                # avg_ocr_enc_box_loss = (accelerator.gather(torch.tensor(ocr_enc_box_loss, device=device).unsqueeze(0)).mean().item())
+                # avg_ocr_enc_giou_loss = (accelerator.gather(torch.tensor(ocr_enc_giou_loss, device=device).unsqueeze(0)).mean().item())
                 avg_globalstep_total_loss = (accelerator.gather(torch.tensor(globalstep_total_loss, device=device).unsqueeze(0)).mean().item())
+                for ocr_key, ocr_val in ocr_losses.items():
+                    if accelerator.is_main_process:
+                        if cfg.log_args.log_tool == 'wandb':
+                            wandb.log({ f"train_ocr_loss/{ocr_key}": accelerator.gather(torch.tensor(ocr_val, device=device).unsqueeze(0)).mean().item() })
+                    ocr_val.clear()
                 # clear list
                 diffusion_loss.clear()
-                ocr_enc_cls_loss.clear()
-                ocr_enc_box_loss.clear()
-                ocr_enc_giou_loss.clear()
+                # ocr_enc_cls_loss.clear()
+                # ocr_enc_box_loss.clear()
+                # ocr_enc_giou_loss.clear()
                 globalstep_total_loss.clear()
                 # log to wandb
                 if accelerator.is_main_process:
                     if cfg.log_args.log_tool == 'wandb':
                         wandb.log({"train_loss/diffusion_loss": avg_diffusion_loss})
-                        wandb.log({"train_loss/ocr_enc_cls_loss": avg_ocr_enc_cls_loss})
-                        wandb.log({"train_loss/ocr_enc_box_loss": avg_ocr_enc_box_loss})
-                        wandb.log({"train_loss/ocr_enc_giou_loss": avg_ocr_enc_giou_loss})
+                        # wandb.log({"train_loss/ocr_enc_cls_loss": avg_ocr_enc_cls_loss})
+                        # wandb.log({"train_loss/ocr_enc_box_loss": avg_ocr_enc_box_loss})
+                        # wandb.log({"train_loss/ocr_enc_giou_loss": avg_ocr_enc_giou_loss})
                         wandb.log({"train_loss/total_globalstep_loss": avg_globalstep_total_loss})
 
 
@@ -297,49 +317,81 @@ def main(args):
                     )
 
 
-                    if cfg.exp_args.model_name == 'diffbir_onlybox':
+                    if cfg.exp_args.model_name == 'diffbir_onlybox' or cfg.exp_args.model_name == 'diffbir_testr' :
 
                         # evaluate diffusion features for different timesteps
                         for sampled_iter, sampled_timestep, unet_feats in train_sampled_unet_feats:
 
                             # OCR model forward pass
-                            train_ocr_loss_dict, train_enc_box_points = models['testr_detector'](unet_feats, train_targets)
+                            sampling_train_ocr_loss_dict, sampling_train_ocr_results = models['testr_detector'](unet_feats, train_targets)
+                            # train ocr total loss
+                            sampling_train_ocr_tot_loss = sum(sampling_train_ocr_loss_dict.values())
 
-                            # train OCR loss 
-                            train_ocr_enc_cls = train_ocr_loss_dict['loss_ce_enc']
-                            train_ocr_enc_box = train_ocr_loss_dict['loss_bbox_enc']
-                            train_ocr_enc_giou = train_ocr_loss_dict['loss_giou_enc']
-                            train_ocr_loss = sum(train_ocr_loss_dict.values())
+
+                            # # train OCR loss 
+                            # train_ocr_enc_cls = train_ocr_loss_dict['loss_ce_enc']
+                            # train_ocr_enc_box = train_ocr_loss_dict['loss_bbox_enc']
+                            # train_ocr_enc_giou = train_ocr_loss_dict['loss_giou_enc']
+                            
 
                             # log sampling train loss and box to wandb
                             if accelerator.is_main_process:
                                 if cfg.log_args.log_tool == 'wandb':
+                                    for ocr_key, ocr_val in sampling_train_ocr_loss_dict.items():
+                                        if accelerator.is_main_process:
+                                            if cfg.log_args.log_tool == 'wandb':
+                                                wandb.log({f"sampling_train_iter{sampled_iter}_timestep{sampled_timestep}/samping_train_{ocr_key}": ocr_val.item()})
+                                    # # log OCR loss 
+                                    # wandb.log({f"sampling_train_iter{sampled_iter}_timestep{sampled_timestep}/train_ocr_enc_cls_loss": train_ocr_enc_cls.item()})
+                                    # wandb.log({f"sampling_train_iter{sampled_iter}_timestep{sampled_timestep}/train_ocr_enc_box_loss": train_ocr_enc_box.item()})
+                                    # wandb.log({f"sampling_train_iter{sampled_iter}_timestep{sampled_timestep}/train_ocr_enc_giou_loss": train_ocr_enc_giou.item()})
+                                    wandb.log({f"sampling_train_iter{sampled_iter}_timestep{sampled_timestep}/sampling_train_ocr_total_loss": sampling_train_ocr_tot_loss.item()})
 
-                                    # log OCR loss 
-                                    wandb.log({f"sampling_train_iter{sampled_iter}_timestep{sampled_timestep}/train_ocr_enc_cls_loss": train_ocr_enc_cls.item()})
-                                    wandb.log({f"sampling_train_iter{sampled_iter}_timestep{sampled_timestep}/train_ocr_enc_box_loss": train_ocr_enc_box.item()})
-                                    wandb.log({f"sampling_train_iter{sampled_iter}_timestep{sampled_timestep}/train_ocr_enc_giou_loss": train_ocr_enc_giou.item()})
-                                    wandb.log({f"sampling_train_iter{sampled_iter}_timestep{sampled_timestep}/train_total_enc_loss": train_ocr_loss.item()})
 
 
-                                    # log OCR bbox prediction
-                                    vis_train_box=[]
+                                    # set threshold
+                                    models['testr_detector'].test_score_threshold = 0.7
+
+                                    # sampling train -  vis poly and text
                                     for i in range(N):
                                         vis_train_gt = gt[i]                                # 3 512 512 [-1,1]
                                         vis_train_gt = (vis_train_gt + 1)/2 * 255.0         # 3 512 512 [0,255]
                                         vis_train_gt = vis_train_gt.permute(1,2,0).detach().cpu().numpy().astype(np.uint8).copy()  # 512 512 3
-                                        # convert cxcywh -> xyxy format for visualization
-                                        for cx, cy, w, h in train_enc_box_points[i]:
-                                            x1 = int((cx - w / 2) * 512)
-                                            y1 = int((cy - h / 2) * 512)
-                                            x2 = int((cx + w / 2) * 512)
-                                            y2 = int((cy + h / 2) * 512)
-                                            cv2.rectangle(vis_train_gt, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                                        vis_train_gt = torch.tensor(vis_train_gt)
-                                        vis_train_gt = vis_train_gt.cuda().permute(2,0,1).float() / 255.0
-                                        vis_train_box.append(vis_train_gt)
-                                    vis_train_box = torch.stack(vis_train_box)        # b 3 512 512
-                                    wandb.log({f'sampling_train_iter{sampled_iter}_timestep{sampled_timestep}/train_vis_box{i}': wandb.Image(vis_train_box, caption=f'draw sampled training pred box on gt')})
+
+                                        results_per_img = sampling_train_ocr_results[i]
+
+                                        for j in range(len(results_per_img.polygons)):
+                                            train_ctrl_pnt= results_per_img.polygons[j].view(16,2).cpu().detach().numpy().astype(np.int32)    # 32 -> 16 2
+                                            train_score = results_per_img.scores[j]                     # 1
+                                            train_rec = results_per_img.recs[j]
+                                            train_pred_text = decode(train_rec)
+
+                                            cv2.polylines(vis_train_gt, [train_ctrl_pnt], True, (0,255,0), 2)
+                                            cv2.putText(vis_train_gt, train_pred_text, (train_ctrl_pnt[0][0], train_ctrl_pnt[0][1]-5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
+                                        cv2.imwrite(f'./tmp{i}.jpg', vis_train_gt[...,::-1])
+                                        wandb.log({f'sampling_train_VIS_iter{sampled_iter}_timestep{sampled_timestep}/sampling_train_vis_ocr{i}': wandb.Image(vis_train_gt, caption=f'draw sampled training ocr results on gt')})
+
+
+                                    # # log OCR bbox prediction
+                                    # vis_train_box=[]
+                                    # for i in range(N):
+                                    #     vis_train_gt = gt[i]                                # 3 512 512 [-1,1]
+                                    #     vis_train_gt = (vis_train_gt + 1)/2 * 255.0         # 3 512 512 [0,255]
+                                    #     vis_train_gt = vis_train_gt.permute(1,2,0).detach().cpu().numpy().astype(np.uint8).copy()  # 512 512 3
+                                    #     # convert cxcywh -> xyxy format for visualization
+                                    #     for cx, cy, w, h in train_enc_box_points[i]:
+                                    #         x1 = int((cx - w / 2) * 512)
+                                    #         y1 = int((cy - h / 2) * 512)
+                                    #         x2 = int((cx + w / 2) * 512)
+                                    #         y2 = int((cy + h / 2) * 512)
+                                    #         cv2.rectangle(vis_train_gt, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                                    #     vis_train_gt = torch.tensor(vis_train_gt)
+                                    #     vis_train_gt = vis_train_gt.cuda().permute(2,0,1).float() / 255.0
+                                    #     vis_train_box.append(vis_train_gt)
+                                    # vis_train_box = torch.stack(vis_train_box)        # b 3 512 512
+                                    # wandb.log({f'sampling_train_iter{sampled_iter}_timestep{sampled_timestep}/train_vis_box{i}': wandb.Image(vis_train_box, caption=f'draw sampled training pred box on gt')})
+
+
 
 
                     ## I dont think we have to log total psnr, ssim, lpips for training..
@@ -383,9 +435,9 @@ def main(args):
             # log validation images 
             if global_step % cfg.val.log_image_every == 0 or global_step == 1:
 
-                tot_val_psnr=0.0
-                tot_val_ssim=0.0
-                tot_val_lpips=0.0
+                tot_val_psnr=[]
+                tot_val_ssim=[]
+                tot_val_lpips=[]
 
                 # Validation
                 for val_batch in val_loader:
@@ -393,7 +445,7 @@ def main(args):
                     # load val data
                     to(val_batch, device)
                     val_batch = batch_transform(val_batch)
-                    val_gt, val_lq, _, val_texts, val_boxes, val_text_encs, val_img_name = val_batch 
+                    val_gt, val_lq, _, val_texts, val_boxes, val_polys, val_text_encs, val_img_name = val_batch 
                     val_gt = rearrange(val_gt, "b h w c -> b c h w").contiguous().float()   # b 3 512 512
                     val_lq = rearrange(val_lq, "b h w c -> b c h w").contiguous().float()
                     val_bs, _, val_H, val_W = val_gt.shape
@@ -435,7 +487,7 @@ def main(args):
                         )
 
                         # =========================== OCR ===========================
-                        if cfg.exp_args.model_name == 'diffbir_onlybox':
+                        if cfg.exp_args.model_name == 'diffbir_onlybox' or cfg.exp_args.model_name == 'diffbir_testr':
 
                             # process annotations for OCR val loss 
                             val_targets=[]
@@ -445,6 +497,7 @@ def main(args):
                                 tmp_dict['labels'] = torch.tensor([0]*num_box).cuda()  # 0 for text
                                 tmp_dict['boxes'] = torch.tensor(val_boxes[i]).cuda()
                                 tmp_dict['texts'] = val_text_encs[i]
+                                tmp_dict['ctrl_points'] = val_polys[i]
                                 val_targets.append(tmp_dict)
 
 
@@ -452,56 +505,82 @@ def main(args):
                             for sampled_iter, sampled_timestep, unet_feats in val_sampled_unet_feats:
 
                                 # OCR model forward pass
-                                val_ocr_loss_dict, val_enc_box_points = models['testr_detector'](unet_feats, val_targets)
+                                sampling_val_ocr_loss_dict, sampling_val_ocr_results = models['testr_detector'](unet_feats, val_targets)
+                                # val ocr total loss
+                                val_ocr_loss = sum(sampling_val_ocr_loss_dict.values())
 
+                                # # val OCR loss
+                                # val_ocr_enc_cls = val_ocr_loss_dict['loss_ce_enc']
+                                # val_ocr_enc_box = val_ocr_loss_dict['loss_bbox_enc']
+                                # val_ocr_enc_giou = val_ocr_loss_dict['loss_giou_enc']
 
-                                # val OCR loss
-                                val_ocr_enc_cls = val_ocr_loss_dict['loss_ce_enc']
-                                val_ocr_enc_box = val_ocr_loss_dict['loss_bbox_enc']
-                                val_ocr_enc_giou = val_ocr_loss_dict['loss_giou_enc']
-                                val_ocr_loss = sum(val_ocr_loss_dict.values())
-
-
-                                # log sampling val loss and box to wandb
+                                # log sampling train loss and box to wandb
                                 if accelerator.is_main_process:
                                     if cfg.log_args.log_tool == 'wandb':
-                                        # log loss values 
-                                        wandb.log({f"sampling_val_iter{sampled_iter}_timestep{sampled_timestep}/val_ocr_enc_cls_loss": val_ocr_enc_cls.item()})
-                                        wandb.log({f"sampling_val_iter{sampled_iter}_timestep{sampled_timestep}/val_ocr_enc_box_loss": val_ocr_enc_box.item()})
-                                        wandb.log({f"sampling_val_iter{sampled_iter}_timestep{sampled_timestep}/val_ocr_enc_giou_loss": val_ocr_enc_giou.item()})
+                                        for ocr_key, ocr_val in sampling_val_ocr_loss_dict.items():
+                                            if accelerator.is_main_process:
+                                                if cfg.log_args.log_tool == 'wandb':
+                                                    wandb.log({f"sampling_val_iter{sampled_iter}_timestep{sampled_timestep}/samping_val_{ocr_key}": ocr_val.item()})
+
+                                        # wandb.log({f"sampling_val_iter{sampled_iter}_timestep{sampled_timestep}/val_ocr_enc_cls_loss": val_ocr_enc_cls.item()})
+                                        # wandb.log({f"sampling_val_iter{sampled_iter}_timestep{sampled_timestep}/val_ocr_enc_box_loss": val_ocr_enc_box.item()})
+                                        # wandb.log({f"sampling_val_iter{sampled_iter}_timestep{sampled_timestep}/val_ocr_enc_giou_loss": val_ocr_enc_giou.item()})
                                         wandb.log({f"sampling_val_iter{sampled_iter}_timestep{sampled_timestep}/val_total_enc_loss": val_ocr_loss.item()})
 
 
-                                    vis_val_box=[]
-                                    for i in range(M):
-                                        vis_val_gt = val_gt[i]              # 3 512 512
-                                        vis_val_gt = (vis_val_gt + 1) / 2 * 255.0
 
-                                        # only label bbox for gt img
-                                        vis_val_gt = vis_val_gt.permute(1,2,0).detach().cpu().numpy().astype(np.uint8).copy()  # 512 512 3
+                                        # vis poly and text
+                                        for i in range(M):
+                                            vis_val_gt = val_gt[i]                                # 3 512 512 [-1,1]
+                                            vis_val_gt = (vis_val_gt + 1)/2 * 255.0         # 3 512 512 [0,255]
+                                            vis_val_gt = vis_val_gt.permute(1,2,0).detach().cpu().numpy().astype(np.uint8).copy()  # 512 512 3
 
-                                        for cx, cy, w, h in val_enc_box_points[i]:
-                                            # Convert cx, cy, w, h (normalized) to x1, y1, x2, y2 (absolute coordinates)
-                                            x1 = int((cx - w / 2) * 512)
-                                            y1 = int((cy - h / 2) * 512)
-                                            x2 = int((cx + w / 2) * 512)
-                                            y2 = int((cy + h / 2) * 512)
+                                            results_per_img = sampling_val_ocr_results[i]
 
-                                            # Draw the rectangle on the image
-                                            cv2.rectangle(vis_val_gt, (x1, y1), (x2, y2), (0, 255, 0), 2)  # Green box with thickness 2
+                                            for j in range(len(results_per_img.polygons)):
+                                                val_ctrl_pnt= results_per_img.polygons[j].view(16,2).cpu().detach().numpy().astype(np.int32)    # 32 -> 16 2
+                                                val_score = results_per_img.scores[j]                     # 1
+                                                val_rec = results_per_img.recs[j]
+                                                val_pred_text = decode(val_rec)
 
-                                        vis_val_gt = torch.tensor(vis_val_gt)
-                                        vis_val_gt = vis_val_gt.cuda().permute(2,0,1).float() / 255.0
-                                        vis_val_box.append(vis_val_gt)
+                                                cv2.polylines(vis_val_gt, [val_ctrl_pnt], True, (0,255,0), 2)
+                                                cv2.putText(vis_val_gt, val_pred_text, (val_ctrl_pnt[0][0], val_ctrl_pnt[0][1]-5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
+                                            # cv2.imwrite(f'./tmp{i}.jpg', vis_val_gt[...,::-1])
+                                            wandb.log({f'sampling_val_VIS_iter{sampled_iter}_timestep{sampled_timestep}/sampling_val_vis_ocr{i}': wandb.Image(vis_val_gt, caption=f'draw sampled val ocr results on gt')})
 
-                                    vis_val_box = torch.stack(vis_val_box)        # b 3 512 512
-                                    wandb.log({f'sampling_val_iter{sampled_iter}_timestep{sampled_timestep}/val_vis_box{i}': wandb.Image(vis_val_box, caption=f'draw sampled val pred box on gt')})
+
+
+
+                                    # vis_val_box=[]
+                                    # for i in range(M):
+                                    #     vis_val_gt = val_gt[i]              # 3 512 512
+                                    #     vis_val_gt = (vis_val_gt + 1) / 2 * 255.0
+
+                                    #     # only label bbox for gt img
+                                    #     vis_val_gt = vis_val_gt.permute(1,2,0).detach().cpu().numpy().astype(np.uint8).copy()  # 512 512 3
+
+                                    #     for cx, cy, w, h in val_enc_box_points[i]:
+                                    #         # Convert cx, cy, w, h (normalized) to x1, y1, x2, y2 (absolute coordinates)
+                                    #         x1 = int((cx - w / 2) * 512)
+                                    #         y1 = int((cy - h / 2) * 512)
+                                    #         x2 = int((cx + w / 2) * 512)
+                                    #         y2 = int((cy + h / 2) * 512)
+
+                                    #         # Draw the rectangle on the image
+                                    #         cv2.rectangle(vis_val_gt, (x1, y1), (x2, y2), (0, 255, 0), 2)  # Green box with thickness 2
+
+                                    #     vis_val_gt = torch.tensor(vis_val_gt)
+                                    #     vis_val_gt = vis_val_gt.cuda().permute(2,0,1).float() / 255.0
+                                    #     vis_val_box.append(vis_val_gt)
+
+                                    # vis_val_box = torch.stack(vis_val_box)        # b 3 512 512
+                                    # wandb.log({f'sampling_val_iter{sampled_iter}_timestep{sampled_timestep}/val_vis_box{i}': wandb.Image(vis_val_box, caption=f'draw sampled val pred box on gt')})
 
 
                         # log total psnr, ssim, lpips for val
-                        tot_val_psnr += torch.mean(metric_psnr(torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, min=0, max=1),torch.clamp((val_log_gt + 1) / 2, min=0, max=1))).item()
-                        tot_val_ssim += torch.mean(metric_ssim(torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, min=0, max=1),torch.clamp((val_log_gt + 1) / 2, min=0, max=1))).item()
-                        tot_val_lpips += torch.mean(metric_lpips(torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, min=0, max=1),torch.clamp((val_log_gt + 1) / 2, min=0, max=1))).item()
+                        tot_val_psnr.append(torch.mean(metric_psnr(torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, min=0, max=1),torch.clamp((val_log_gt + 1) / 2, min=0, max=1))).item())
+                        tot_val_ssim.append(torch.mean(metric_ssim(torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, min=0, max=1),torch.clamp((val_log_gt + 1) / 2, min=0, max=1))).item())
+                        tot_val_lpips.append(torch.mean(metric_lpips(torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, min=0, max=1),torch.clamp((val_log_gt + 1) / 2, min=0, max=1))).item())
 
 
                         # log sampling val imgs to wandb
@@ -533,6 +612,12 @@ def main(args):
                     for model in models.values():
                         if isinstance(model, nn.Module):
                             model.train()
+
+
+                # average using numpy
+                tot_val_psnr = np.array(tot_val_psnr).mean()
+                tot_val_ssim = np.array(tot_val_ssim).mean()
+                tot_val_lpips = np.array(tot_val_lpips).mean()
 
 
                 # log total val metrics 

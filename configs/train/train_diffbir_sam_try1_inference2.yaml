@@ -120,10 +120,11 @@ dataset:
       # additional args
       data_args: {
         'mode': 'train',
-        'datasets':['TextOCR'], 
+        'datasets':['SAM'], 
         'ann_path':'/media/dataset1/jinlovespho/NIPS2025/data/generated_data/ocr',
         'ctrl_point': 'bbox',
-        'bbox_format': 'cxcywh_scaled',
+        # xywh_unscaled, xyxy_scaled, cxcywh_scaled
+        'bbox_format': 'cxcywh_scaled', 
         'model_img_size': [512, 512],
         'use_prompt':False
         }
@@ -148,9 +149,10 @@ dataset:
       # additional args
       data_args: {
         'mode': 'val',
-        'datasets':['TextOCR'],
+        'datasets':['SAM'],
         'ann_path':'/media/dataset1/jinlovespho/NIPS2025/data/generated_data/ocr',
         'ctrl_point': 'bbox',
+        # xywh_unscaled, xyxy_scaled, cxcywh_scaled
         'bbox_format': 'cxcywh_scaled',
         'model_img_size': [512, 512],
         'use_prompt':False
@@ -178,12 +180,11 @@ train:
   ckpt_every: 10000
   log_loss_every: 50
   log_image_every: 500
-  batch_size: 4
-  log_num_train_img: 4
-  learning_rate: 1e-3
+  batch_size: 2
+  log_num_train_img: 2
+  learning_rate: 1e-4
   # experiment directory path
-  # exp_dir: ./results/pho_server5_gpu0_diffbir_onlybox_FTctrlnet_and_only_testr_detector_bs4_lr1e-3_noprompt
-  exp_dir: ./results/TEST
+  exp_dir: ./results/INFERENCE
 
 
 val:
@@ -197,16 +198,17 @@ log_args:
   log_tool: wandb
   wandb_key: e32eed0c2509bf898b850b0065ab62345005fb73
   wandb_proj_name: DiffBIR_OCR_finetuning
-  # wandb_exp_name: pho_server5_gpu0_diffbir_onlybox_FTctrlnet_and_only_testr_detector_bs4_lr1e-3_noprompt
-  wandb_exp_name: TEST
+  # wandb_exp_name: pho_server5_gpu0_diffbir_testr_FTctrlnet_and_testr_bs2_lr1e-5_noprompt
+  wandb_exp_name: INFERENCE_10k_pho_server5_gpu1_diffbir_testr_FTctrlnet_and_testr_bs2_lr1e-4_noprompt_visthreshold0.7
 
 
 exp_args:
-  model_name: diffbir_onlybox
-  # finetuning_method: only_ctrlnet, only_testr_detector, ctrlnet_and_only_testr_detector
-  finetuning_method: ctrlnet_and_only_testr_detector
+  model_name: diffbir_testr
+  # finetuning_method: only_ctrlnet, only_testr_detector, ctrlnet_and_only_testr_detector, 
+  # finetuning_method: testr, ctrlnet_and_testr
+  finetuning_method: ctrlnet_and_testr
   unet_feat_sampling_timestep: [10,20,30,40,50]
-  resume_ckpt_dir:
+  resume_ckpt_dir: ./results/pho_server5_gpu1_diffbir_testr_FTctrlnet_and_testr_bs2_lr1e-4_noprompt
 
   
   

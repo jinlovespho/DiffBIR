@@ -22,6 +22,10 @@ def load_experiment_settings(accelerator, cfg):
 
     # setup logging tool
     if cfg.log_args.log_tool == 'wandb':
+
+        # set wandb exp name 
+        breakpoint()
+
         wandb.login(key=cfg.log_args.wandb_key)
         wandb.init(project=cfg.log_args.wandb_proj_name, 
                 name=cfg.log_args.wandb_exp_name, 
@@ -115,7 +119,8 @@ def load_model(accelerator, device, args, cfg):
     # ------------------------ ADD MODELS -------------------------------
 
     # training ocr detection with diffbir features
-    if cfg.exp_args.model_name == 'diffbir_onlybox':
+    if cfg.exp_args.model_name == 'diffbir_onlybox' or cfg.exp_args.model_name == 'diffbir_testr':
+
         sys.path.append('/media/dataset1/jinlovespho/NIPS2025/DiffBIR/testr')
         from testr.adet.modeling.transformer_detector import TransformerDetector
         from testr.adet.config import get_cfg
@@ -131,6 +136,35 @@ def load_model(accelerator, device, args, cfg):
     # add other models
     elif cfg.exp_args.model_name == '':
         pass
+
+
+
+    # -------------------------------- RESUME TRAINING ---------------------------------------
+    if cfg.exp_args['resume_ckpt_dir'] is not None:
+
+        # set ckpt path
+        ckpt_dir = f"{cfg.exp_args['resume_ckpt_dir']}/checkpoints"
+        ckpts = sorted(os.listdir(ckpt_dir))
+        ckpt_path = f"{ckpt_dir}/{ckpts[-3]}"        
+        ckpt=torch.load(ckpt_path, map_location="cpu")
+
+
+        # print
+        if accelerator.is_main_process:
+            print('RESUME CKPT: ', ckpt_path)
+
+
+        # Efficient weight loading with missing key handling
+        for model_name, model in loaded_models.items():
+            if model_name in ckpt:
+                missing, unexpected = model.load_state_dict(ckpt[model_name], strict=False)
+                print(f"Loaded {model_name} | Missing keys: {len(missing)} | Unexpected keys: {len(unexpected)}")
+            else:
+                print(f"⚠️ Warning: No checkpoint found for {model_name}")
+
+        # Move models to the correct device (if needed)
+        for model in loaded_models.values():
+            model.to(device)
 
 
     return loaded_models
@@ -188,6 +222,26 @@ def set_training_params(accelerator, models, cfg):
                     train_params.append(param)
                 else:
                     param.requires_grad = False
+            
+            # train all components of testr
+            elif cfg.exp_args.finetuning_method == 'testr':
+                if 'testr' in name:
+                    param.requires_grad = True
+                    train_model_names.append(name)
+                    train_params.append(param)
+                else:
+                    param.requires_grad = False
+
+            # train ctrlnet and all components of testr
+            elif cfg.exp_args.finetuning_method == 'ctrlnet_and_testr':
+                if 'testr' in name or 'controlnet' in name:
+                    param.requires_grad = True
+                    train_model_names.append(name)
+                    train_params.append(param)
+                else:
+                    param.requires_grad = False
+                    
+
 
     # print modules to be trained
     if accelerator.is_main_process:

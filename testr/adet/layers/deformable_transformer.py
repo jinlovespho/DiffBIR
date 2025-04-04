@@ -122,6 +122,7 @@ class DeformableTransformer(nn.Module):
 
     def forward(self, srcs, masks, pos_embeds, query_embed, text_embed, text_pos_embed, text_mask=None):
         # prepare input for encoder
+
         src_flatten = []
         mask_flatten = []
         lvl_pos_embed_flatten = []
@@ -137,34 +138,35 @@ class DeformableTransformer(nn.Module):
             lvl_pos_embed_flatten.append(lvl_pos_embed)
             src_flatten.append(src)
             mask_flatten.append(mask)
-        src_flatten = torch.cat(src_flatten, 1)
-        mask_flatten = torch.cat(mask_flatten, 1)
-        lvl_pos_embed_flatten = torch.cat(lvl_pos_embed_flatten, 1)
+        src_flatten = torch.cat(src_flatten, 1)     # b tot_N d                  
+        mask_flatten = torch.cat(mask_flatten, 1)   # b tot_N
+        lvl_pos_embed_flatten = torch.cat(lvl_pos_embed_flatten, 1)     # b tot_N d
         spatial_shapes = torch.as_tensor(spatial_shapes, dtype=torch.long, device=src_flatten.device)
         level_start_index = torch.cat((spatial_shapes.new_zeros((1, )), spatial_shapes.prod(1).cumsum(0)[:-1]))
         valid_ratios = torch.stack([self.get_valid_ratio(m) for m in masks], 1)
 
-        # encoder
-        memory = self.encoder(src_flatten, spatial_shapes, level_start_index, valid_ratios, lvl_pos_embed_flatten, mask_flatten)
 
-        # breakpoint()
+        # encoder
+        memory = self.encoder(src_flatten, spatial_shapes, level_start_index, valid_ratios, lvl_pos_embed_flatten, mask_flatten)    # b tot_N d
+
         # prepare input for decoder
         bs, _, c = memory.shape
-        output_memory, output_proposals = self.gen_encoder_output_proposals(memory, mask_flatten, spatial_shapes)
+        output_memory, output_proposals = self.gen_encoder_output_proposals(memory, mask_flatten, spatial_shapes)       # (b tot_N d), (b tot_N 4)
+
 
         # hack implementation for two-stage Deformable DETR
-        enc_outputs_class = self.bbox_class_embed(output_memory)                            # b 7252 1
-        enc_outputs_coord_unact = self.bbox_embed(output_memory) + output_proposals         # b 7252 4
+        enc_outputs_class = self.bbox_class_embed(output_memory)                            # b tot_N 1 -> for total of N tokens, they are all class proposals
+        enc_outputs_coord_unact = self.bbox_embed(output_memory) + output_proposals         # b tot_N 4 -> for total of N tokens, they are all box proposals
 
-        topk = self.num_proposals   # 100
-        topk_proposals = torch.topk(enc_outputs_class[..., 0], topk, dim=1)[1]  # b 100
-        topk_coords_unact = torch.gather(enc_outputs_coord_unact, 1, topk_proposals.unsqueeze(-1).repeat(1, 1, 4))  # b 100 4
-        topk_coords_unact = topk_coords_unact.detach()      # b 100 4
-        reference_points = topk_coords_unact.sigmoid()      # b 100 4
-        init_reference_out = reference_points               # # b 100 4
-        query_pos = self.pos_trans_norm(self.pos_trans(self.get_proposal_pos_embed(topk_coords_unact))) # b 100 256
-        query_embed = query_embed.unsqueeze(0).expand(bs, -1, -1, -1)                                   # b 100 16 256
-        query_pos = query_pos[:, :, None, :].repeat(1, 1, query_embed.shape[2], 1)                      # b 100 25 26
+        topk = self.num_proposals   # K=100
+        topk_proposals = torch.topk(enc_outputs_class[..., 0], topk, dim=1)[1]  # b K
+        topk_coords_unact = torch.gather(enc_outputs_coord_unact, 1, topk_proposals.unsqueeze(-1).repeat(1, 1, 4))  # b K 4
+        topk_coords_unact = topk_coords_unact.detach()      # b K 4
+        reference_points = topk_coords_unact.sigmoid()      # b K 4
+        init_reference_out = reference_points               # # b K 4
+        query_pos = self.pos_trans_norm(self.pos_trans(self.get_proposal_pos_embed(topk_coords_unact))) # b K 256
+        query_embed = query_embed.unsqueeze(0).expand(bs, -1, -1, -1)                                   # b K 16 256
+        query_pos = query_pos[:, :, None, :].repeat(1, 1, query_embed.shape[2], 1)                      # b K 25 26
         text_embed = text_embed.unsqueeze(0).expand(bs, -1, -1, -1)
 
         # decoder

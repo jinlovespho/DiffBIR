@@ -184,49 +184,71 @@ class TransformerDetector(nn.Module):
         # images = self.preprocess_image(batched_inputs)
         output = self.testr(extracted_feats)
 
-        # dec_poly_cls = output['pred_logits']            # b 100 16 1
-        # dec_poly_coord = output['pred_ctrl_points']     # b 100 16 2
 
-        enc_out = output['enc_outputs']
-        box_cls = enc_out['pred_logits']        # b 7252 1  
-        box_coord = enc_out['pred_boxes']       # b 7252 4
+        '''
+        (Pdb) output.keys() 
+        dict_keys(['pred_logits', 'pred_ctrl_points', 'pred_texts', 'aux_outputs', 'enc_outputs'])
+        
+        (Pdb) output['pred_logits'].shape           # for 100 query points, each have 16 polygon points, these will be used for text classification
+        torch.Size([4, 100, 16, 1])
 
-        box_filtered_coord = enc_out['pred_filtered_boxes'] # b 100 4
+        (Pdb) output['pred_ctrl_points'].shape      # for 100 query points, each have 16 polygon points, where each point is (x,y)
+        torch.Size([4, 100, 16, 2])
 
-        topk=10
-        topk_proposals = torch.topk(box_cls[..., 0], topk, dim=1)[1]  # b 100
-        topk_coords_unact = torch.gather(box_coord, 1, topk_proposals.unsqueeze(-1).repeat(1, 1, 4))  # b 100 4
-        enc_box_points = topk_coords_unact.detach()      # b 10 4
+        (Pdb) output['pred_texts'].shape            # for 100 query points, each have max_word_len=25, which will be used to predict a word
+        torch.Size([4, 100, 25, 97])
 
-        # targets = self.prepare_targets(instances)
+
+        '''
+
+        ## USING ONLY ENCODE BOUNDING BOX!! 
+        # enc_out = output['enc_outputs']
+        # box_cls = enc_out['pred_logits']        # b 7252 1  
+        # box_coord = enc_out['pred_boxes']       # b 7252 4        
+        # topk=10
+        # box_cls = box_cls.sigmoid()
+        # topk_val, topk_proposals = torch.topk(box_cls[..., 0], topk, dim=1)  # b 100
+        # topk_coords_unact = torch.gather(box_coord, 1, topk_proposals.unsqueeze(-1).repeat(1, 1, 4))  # b 100 4
+        # enc_box_points = topk_coords_unact.detach()      # b 10 4
+        # loss_dict = self.criterion(output, targets)
+        # weight_dict = self.criterion.weight_dict
+        # for k in loss_dict.keys():
+        #     if k in weight_dict:
+        #         loss_dict[k] *= weight_dict[k]
+        # return loss_dict, enc_box_points
+    
+
+        bs = output['pred_logits'].shape[0]
+        image_sizes = [(512,512) for _ in range(bs)]
+
+
+        # gt_instances = [x["instances"].to(self.device) for x in batched_inputs]
+        # targets = self.prepare_targets(gt_instances)
         loss_dict = self.criterion(output, targets)
         weight_dict = self.criterion.weight_dict
         for k in loss_dict.keys():
             if k in weight_dict:
                 loss_dict[k] *= weight_dict[k]
-        return loss_dict, enc_box_points
+
+        
+        ctrl_point_cls = output["pred_logits"]          # b k 16 1
+        ctrl_point_coord = output["pred_ctrl_points"]   # b k 16 2 
+        text_pred = output["pred_texts"]                # b k 25 97
+        results = self.inference(ctrl_point_cls, ctrl_point_coord, text_pred, image_sizes)
 
 
-        if self.training:
-            # targets = self.prepare_targets(instances)
-            loss_dict = self.criterion(output, targets)
-            weight_dict = self.criterion.weight_dict
-            for k in loss_dict.keys():
-                if k in weight_dict:
-                    loss_dict[k] *= weight_dict[k]
-            return loss_dict, enc_box_points
-        else:
-            ctrl_point_cls = output["pred_logits"]
-            ctrl_point_coord = output["pred_ctrl_points"]
-            text_pred = output["pred_texts"]
-            results = self.inference(ctrl_point_cls, ctrl_point_coord, text_pred, images.image_sizes)
-            processed_results = []
-            for results_per_image, input_per_image, image_size in zip(results, batched_inputs, images.image_sizes):
-                height = input_per_image.get("height", image_size[0])
-                width = input_per_image.get("width", image_size[1])
-                r = detector_postprocess(results_per_image, height, width)
-                processed_results.append({"instances": r})
-            return processed_results
+        return loss_dict, results
+    
+        processed_results = []
+        for results_per_image, input_per_image, image_size in zip(results, batched_inputs, image_sizes):
+            # breakpoint()
+            height = input_per_image.get("height", image_size[0])
+            width = input_per_image.get("width", image_size[1])
+            r = detector_postprocess(results_per_image, height, width)      # scale polygon coord values
+            processed_results.append({"instances": r})
+        return processed_results
+        
+
 
     def prepare_targets(self, targets):
         new_targets = []
@@ -253,6 +275,7 @@ class TransformerDetector(nn.Module):
         for scores_per_image, labels_per_image, ctrl_point_per_image, text_per_image, image_size in zip(
             scores, labels, ctrl_point_coord, text_pred, image_sizes
         ):
+            # breakpoint()
             selector = scores_per_image >= self.test_score_threshold
             scores_per_image = scores_per_image[selector]
             labels_per_image = labels_per_image[selector]

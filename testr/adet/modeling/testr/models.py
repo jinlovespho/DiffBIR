@@ -231,6 +231,44 @@ class TESTR(nn.Module):
         # (Pdb) srcs[3].shape torch.Size([2, 256, 56, 56])
 
         # breakpoint()
+
+
+        ''' 이해 O
+        우리는 bbox, 또는 polygon, 또는 word가 되는 query를 learn하고 싶음.
+        따라서 learnable query를 선언해주고 이것이 model을 거치면서 bbox 또는 polygon 또는 word가 됨.
+        이제 query 하나의 shape를 결정짓는 요소는 box 또는 polygon 또는 word를 어떻게 표현할지에 따라서 다름.
+
+        box로 query를 표현할 경우, box는 (x,y,w,h) 4개의 값으로 표현하면 되기에, 하나의 query.shape = (4,) 이면 된다.
+        N개의 query를 사용할 경우 -> (N,4) 이면 충분
+
+        polygon을 query로 표현할 경우, polygon은 16개의 point, 각 point는 2개의 좌표가 필요하기에, query.shape = (16,2) 가 된다.
+        N개의 query를 사용할 경우 -> (N,16,2)이면 충분
+        
+        word를 query로 표현할 경우, word의 maxlen=20이라고 하면, 하나의 자리에 최대 26개의 알파벳중 하나가 오기에, query.shape = (20, 26) 가 된다.
+        N개의 query를 사용할 경우 -> (N,20,26) 이면 충분
+
+        
+        다시 돌아와서, query가 box,polygon,word등 다양하게 될 수 있다. 이는 최종 output linear layer을 거쳐서 dimension을 맞춰줄 수 있다.
+        예를 들어 box가 될 query의 경우, (N,256) -> linear -> (N,4) 로 마지막에 query별로 4개의 box좌표값만 뱉으면 된다.
+
+        따라서 선언할 때는 굳이 최종 shape으로 선언해줄 필요가 없다.
+        box의 경우, torch.rand(hidden_dim) -> linear -> 4
+
+        polygon의 경우 torch.rand(16, hidden_dim) -> linear -> (16,2)
+        or
+        poly_emb = nn.Embedding(16,hidden_dim)
+        poly_emb.weight: (16,256) -> linear -> (16,2)
+        
+        word의 경우, torch.rand(20, hidden_dim) -> linear -> (20,26) 
+        or
+        word_emb = nn.Embedding(20,hidden_dim)
+        word_emb.weight: (20,hidden_dim) -> linear -> (20,26)
+
+
+        '''
+
+        # breakpoint()
+
         # n_points, embed_dim --> n_objects, n_points, embed_dim
         ctrl_point_embed = self.ctrl_point_embed.weight[None, ...].repeat(self.num_proposals, 1, 1)                     # 100 16 256
         text_pos_embed = self.text_pos_embed(self.text_embed.weight)[None, ...].repeat(self.num_proposals, 1, 1)        # 100 25 256
