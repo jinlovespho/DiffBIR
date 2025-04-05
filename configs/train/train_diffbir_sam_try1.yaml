@@ -119,14 +119,12 @@ dataset:
       jpeg_range: [30, 100]
       # additional args
       data_args: {
-        'mode': 'train',
+        'mode': 'TRAIN',
         'datasets':['SAM'], 
         'ann_path':'/media/dataset1/jinlovespho/NIPS2025/data/generated_data/ocr',
-        'ctrl_point': 'bbox',
         # xywh_unscaled, xyxy_scaled, cxcywh_scaled
         'bbox_format': 'cxcywh_scaled', 
         'model_img_size': [512, 512],
-        'use_prompt':False
         }
   
   # validation data config
@@ -148,43 +146,37 @@ dataset:
       jpeg_range: [30, 100]
       # additional args
       data_args: {
-        'mode': 'val',
+        'mode': 'VAL',
         'datasets':['SAM'],
         'ann_path':'/media/dataset1/jinlovespho/NIPS2025/data/generated_data/ocr',
-        'ctrl_point': 'bbox',
         # xywh_unscaled, xyxy_scaled, cxcywh_scaled
         'bbox_format': 'cxcywh_scaled',
         'model_img_size': [512, 512],
-        'use_prompt':False
         }
 
     
 batch_transform:
   target: diffbir.dataset.batch_transform.IdentityBatchTransform
 
+
 # training args
 train:
   # pretrained sd v2.1 path
   sd_path: ./weights/v2-1_512-ema-pruned.ckpt
   # stage 1 swinir path.
-  # In our paper, we use SwinIR trained on ImageNet-1k with codeformer degradation.
   swinir_path: ./weights/codeformer_swinir.ckpt
   resume: ./weights/DiffBIR_v2.1.pt
-  # ImageNet 1k (1.3M images)
-  # batch size = 192, lr = 1e-4, total training steps = 25k
-  # Our filtered laion2b-en (15M images)
-  # batch size = 256, lr = 1e-4 (first 30k), 1e-5 (next 50k), total training steps = 80k
   noise_aug_timestep: 0
   num_workers: 4
-  train_steps: 30000
-  ckpt_every: 10000
+  train_steps: 60000
+  ckpt_every: 20000
   log_loss_every: 50
   log_image_every: 500
-  batch_size: 2
-  log_num_train_img: 2
-  learning_rate: 1e-5
-  # experiment directory path
-  exp_dir: ./results/TEST
+  batch_size: 3
+  log_num_train_img: 3
+  learning_rate: 1e-4
+  # experiment save directory path
+  exp_dir: ./model_ckpts
 
 
 val:
@@ -198,16 +190,19 @@ log_args:
   log_tool: wandb
   wandb_key: e32eed0c2509bf898b850b0065ab62345005fb73
   wandb_proj_name: DiffBIR_OCR_finetuning
-  wandb_exp_name: pho_server5_gpu0_TRAIN_diffbir_testr_FTctrlnet_and_testr_bs2_lr1e-5_noprompt
 
 
 exp_args:
+  log_additional_msg: nullprompt
+  log_user: pho
+  log_server: server5
+  log_gpu: gpu2
   # choose from [TRAIN, INFERENCE]
   mode: TRAIN
   model_name: diffbir_testr
   # finetuning_method: only_ctrlnet, only_testr_detector, ctrlnet_and_only_testr_detector, 
   # finetuning_method: testr, ctrlnet_and_testr
-  finetuning_method: testr
+  finetuning_method: ctrlnet_and_testr
   unet_feat_sampling_timestep: [10,20,30,40,50]
   resume_ckpt_dir: 
 

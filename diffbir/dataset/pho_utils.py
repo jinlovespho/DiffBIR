@@ -185,6 +185,16 @@ def load_file_list(file_list_path: str, data_args=None):
             json_path = f'transformed_dataset.json'
             with open(f'{ann_path}/{json_path}', 'r') as f:
                 json_data = json.load(f)
+                json_data = sorted(json_data.items())
+
+
+            # TEMPORARY
+            # split train and val ratio 10:1
+            split_index = int(len(json_data) * 10 / 11)
+            if mode == 'TRAIN':
+                json_data = dict(json_data[:split_index])
+            elif mode == 'VAL':
+                json_data = dict(json_data[split_index:])
 
 
             imgs = sorted(os.listdir(f'{file_list_path}/{dataset}/clean_crops'))
@@ -193,7 +203,11 @@ def load_file_list(file_list_path: str, data_args=None):
 
                 # (example) img: sa_8558_crop_1_crop_0.jpg
                 img_id = '_'.join(img.split('_')[:4])   # sa_8558_crop_1 까지가 id
-                img_ann = json_data[img_id]
+
+                if img_id in json_data.keys():
+                    img_ann = json_data[img_id]
+                else:
+                    continue
 
                 model_H, model_W = data_args['model_img_size']
 
@@ -276,10 +290,10 @@ def load_file_list(file_list_path: str, data_args=None):
                               "bbox": boxes,
                               'poly': polys,
                               'text_enc': text_encs, 
-                              "img_name": img_id})
-            
+                              "img_name": img_id})         
 
-    if mode=='val':
+
+    if mode=='VAL':
         files = random.sample(files, 24)
     return files
 

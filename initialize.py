@@ -10,32 +10,36 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 import torch 
 
+
+
 def load_experiment_settings(accelerator, cfg):
 
+    # EXPERIMENT NAME
+    exp_name = f"{cfg.exp_args.log_user}_{cfg.exp_args.log_server}_{cfg.exp_args.log_gpu}_{cfg.exp_args.mode}_{cfg.exp_args.model_name}_FT{cfg.exp_args.finetuning_method}_bs{cfg.train.batch_size}_lr{cfg.train.learning_rate}_{cfg.exp_args.log_additional_msg}"
+    
+    if accelerator.is_main_process:
+        print('=======================================================================================================')
+        print('EXPERIMENT NAME: ', exp_name)
+        print('=======================================================================================================')
 
     # setup an experiment folder
     exp_dir = cfg.train.exp_dir
     os.makedirs(exp_dir, exist_ok=True)
-    ckpt_dir = os.path.join(exp_dir, "checkpoints")
+    ckpt_dir = os.path.join(exp_dir, exp_name)
     os.makedirs(ckpt_dir, exist_ok=True)
-
 
     # setup logging tool
     if cfg.log_args.log_tool == 'wandb':
-
-        # set wandb exp name 
-        breakpoint()
-
         wandb.login(key=cfg.log_args.wandb_key)
         wandb.init(project=cfg.log_args.wandb_proj_name, 
-                name=cfg.log_args.wandb_exp_name, 
+                name=exp_name, 
                 config=argparse.Namespace(**OmegaConf.to_container(cfg, resolve=True))
         )
-        return exp_dir, ckpt_dir, None
-    
+        return exp_dir, ckpt_dir, exp_name, None
     elif cfg.log_args.log_tool == 'tensorboard':
         writer = SummaryWriter(exp_dir)
-        return exp_dir, ckpt_dir, writer
+        return exp_dir, ckpt_dir, exp_name, writer
+
 
 def load_data(accelerator, cfg):
 
@@ -245,7 +249,7 @@ def set_training_params(accelerator, models, cfg):
 
     # print modules to be trained
     if accelerator.is_main_process:
-        print('================================== MODELS TO BE TRAINED ==================================')
+        print('================================================================= MODELS TO BE TRAINED =================================================================')
         chunk_size = 10  # Adjust based on readability
         for i in range(0, len(train_model_names), chunk_size):
             print(train_model_names[i:i+chunk_size])  # Print in smaller chunks
