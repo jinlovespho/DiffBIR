@@ -174,7 +174,7 @@ train:
   log_image_every: 500
   batch_size: 3
   log_num_train_img: 3
-  learning_rate: 1e-4
+  learning_rate: 1e-5
   # experiment save directory path
   exp_dir: ./model_ckpts
 
@@ -196,13 +196,13 @@ exp_args:
   log_additional_msg: nullprompt
   log_user: pho
   log_server: server5
-  log_gpu: gpu2
+  log_gpu: gpu1
   # choose from [TRAIN, INFERENCE]
   mode: TRAIN
-  model_name: diffbir_testr
-  # finetuning_method: only_ctrlnet, only_testr_detector, ctrlnet_and_only_testr_detector, 
+  model_name: diffbir_baseline
+  # finetuning_method: ctrlnet, testr_detector, ctrlnet_and_testr_detector, 
   # finetuning_method: testr, ctrlnet_and_testr
-  finetuning_method: ctrlnet_and_testr
+  finetuning_method: ctrlnet 
   unet_feat_sampling_timestep: [10,20,30,40,50]
   resume_ckpt_dir: 
 

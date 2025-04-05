@@ -179,7 +179,7 @@ def load_file_list(file_list_path: str, data_args=None):
 
 
 
-        elif dataset == 'SAM':
+        elif dataset == 'sam':
             
             # load json
             json_path = f'transformed_dataset.json'

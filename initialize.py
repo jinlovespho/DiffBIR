@@ -15,7 +15,8 @@ import torch
 def load_experiment_settings(accelerator, cfg):
 
     # EXPERIMENT NAME
-    exp_name = f"{cfg.exp_args.log_user}_{cfg.exp_args.log_server}_{cfg.exp_args.log_gpu}_{cfg.exp_args.mode}_{cfg.exp_args.model_name}_FT{cfg.exp_args.finetuning_method}_bs{cfg.train.batch_size}_lr{cfg.train.learning_rate}_{cfg.exp_args.log_additional_msg}"
+    datasets='_'.join((cfg.dataset.train.params.data_args['datasets']))
+    exp_name = f"{cfg.exp_args.log_user}_{cfg.exp_args.log_server}_{cfg.exp_args.log_gpu}_{cfg.exp_args.mode}_DATA_{datasets}_MODEL_{cfg.exp_args.model_name}_FT_{cfg.exp_args.finetuning_method}_bs{cfg.train.batch_size}_lr{cfg.train.learning_rate}_{cfg.exp_args.log_additional_msg}"
     
     if accelerator.is_main_process:
         print('=======================================================================================================')
@@ -192,7 +193,7 @@ def set_training_params(accelerator, models, cfg):
                 train_params.append(param)
 
 
-            elif cfg.exp_args.finetuning_method == 'only_ctrlnet':
+            elif cfg.exp_args.finetuning_method == 'ctrlnet':
                 if 'controlnet' in name:
                     param.requires_grad = True
                     train_model_names.append(name)
@@ -201,7 +202,7 @@ def set_training_params(accelerator, models, cfg):
                     param.requires_grad = False
 
 
-            elif cfg.exp_args.finetuning_method == 'only_unet':
+            elif cfg.exp_args.finetuning_method == 'unet':
                 if 'unet' in name:
                     param.requires_grad = True
                     train_model_names.append(name)
@@ -210,7 +211,7 @@ def set_training_params(accelerator, models, cfg):
                     param.requires_grad = False
             
             
-            elif cfg.exp_args.finetuning_method == 'only_testr_detector':
+            elif cfg.exp_args.finetuning_method == 'testr_detector':
                 if 'testr.transformer.encoder' in name or 'testr.transformer.level_embed' in name:
                     param.requires_grad = True
                     train_model_names.append(name)
@@ -219,7 +220,7 @@ def set_training_params(accelerator, models, cfg):
                     param.requires_grad = False
 
 
-            elif cfg.exp_args.finetuning_method == 'ctrlnet_and_only_testr_detector':
+            elif cfg.exp_args.finetuning_method == 'ctrlnet_and_testr_detector':
                 if 'controlnet' in name or 'testr.transformer.encoder' in name or 'testr.transformer.level_embed' in name:
                     param.requires_grad = True
                     train_model_names.append(name)
