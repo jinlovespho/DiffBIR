@@ -78,6 +78,7 @@ def main(args):
     # print Training Info
     if accelerator.is_main_process:
         print('='*50)
+        print(f'Experiment name: {exp_name}')
         print(f"Training steps: {cfg.train.train_steps}")
         print(f"Experiment directory: {exp_dir}")
         print(f"Num train_dataset: {len(train_ds):,}")
