@@ -29,17 +29,18 @@ def load_experiment_settings(accelerator, cfg):
     ckpt_dir = os.path.join(exp_dir, exp_name)
     os.makedirs(ckpt_dir, exist_ok=True)
 
-    # setup logging tool
-    if cfg.log_args.log_tool == 'wandb':
-        wandb.login(key=cfg.log_args.wandb_key)
-        wandb.init(project=cfg.log_args.wandb_proj_name, 
-                name=exp_name, 
-                config=argparse.Namespace(**OmegaConf.to_container(cfg, resolve=True))
-        )
-        return exp_dir, ckpt_dir, exp_name, None
-    elif cfg.log_args.log_tool == 'tensorboard':
-        writer = SummaryWriter(exp_dir)
-        return exp_dir, ckpt_dir, exp_name, writer
+    if accelerator.is_main_process:
+        # setup logging tool
+        if cfg.log_args.log_tool == 'wandb':
+            wandb.login(key=cfg.log_args.wandb_key)
+            wandb.init(project=cfg.log_args.wandb_proj_name, 
+                    name=exp_name, 
+                    config=argparse.Namespace(**OmegaConf.to_container(cfg, resolve=True))
+            )
+            return exp_dir, ckpt_dir, exp_name, None
+        elif cfg.log_args.log_tool == 'tensorboard':
+            writer = SummaryWriter(exp_dir)
+            return exp_dir, ckpt_dir, exp_name, writer
 
 
 def load_data(accelerator, cfg):
@@ -125,8 +126,7 @@ def load_model(accelerator, device, args, cfg):
 
     # training ocr detection with diffbir features
     if cfg.exp_args.model_name == 'diffbir_onlybox' or cfg.exp_args.model_name == 'diffbir_testr':
-
-        sys.path.append('/media/dataset1/jinlovespho/NIPS2025/DiffBIR/testr')
+        sys.path.append(f'{os.getcwd()}/testr')
         from testr.adet.modeling.transformer_detector import TransformerDetector
         from testr.adet.config import get_cfg
 
@@ -246,6 +246,14 @@ def set_training_params(accelerator, models, cfg):
                 else:
                     param.requires_grad = False
                     
+            elif cfg.exp_args.finetuning_method == 'ctrlnet_and_unetAttn':
+                if 'controlnet' in name or ('unet' in name and 'attn' in name):
+                    param.requires_grad = True
+                    train_model_names.append(name)
+                    train_params.append(param)
+                else:
+                    param.requires_grad = False
+
 
 
     # print modules to be trained

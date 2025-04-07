@@ -174,7 +174,7 @@ train:
   log_image_every: 500
   batch_size: 3
   log_num_train_img: 3
-  learning_rate: 1e-5
+  learning_rate: 1e-4
   # experiment save directory path
   exp_dir: ./model_ckpts
 

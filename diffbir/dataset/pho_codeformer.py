@@ -176,7 +176,7 @@ def collate_fn(batch):
     poly_tensor=[]
     # process poly
     for i in range(len(poly)):
-        poly_tensor.append(torch.tensor(poly[i], dtype=torch.float32))
+        poly_tensor.append(torch.tensor(np.array(poly[i]), dtype=torch.float32))
         
 
     return gt, lq, list(prompts), list(text), list(bbox), list(poly_tensor), list(text_enc_tensor), list(img_name)
