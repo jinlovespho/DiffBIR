@@ -87,6 +87,7 @@ def main(args):
         print(f"Num val_dataset: {len(val_ds):,}")
         print(f'Loaded models: {list(models.keys())}')
         print(f'Finetuning Method: {cfg.exp_args.finetuning_method}')
+        print(f'Resume training ckpt: ', cfg.exp_args.resume_ckpt)
         print('='*50)
 
 
@@ -377,10 +378,10 @@ def main(args):
                         wandb.log({ f'sampling_train_FINAL_VIS/train_gt': wandb.Image((log_gt + 1) / 2, caption=f'gt_img'),
                                     f'sampling_train_FINAL_VIS/train_lq': wandb.Image(log_lq, caption=f'lq_img'),
                                     f'sampling_train_FINAL_VIS/train_cleaned': wandb.Image(log_clean, caption=f'cleaned_img'),
-                                    f'sampling_train_FINAL_VIS/train_sampled': wandb.Image((pure_cldm.vae_decode(z) + 1) / 2, caption=f'sampled_img'),
+                                    f'sampling_train_FINAL_VIS/train_sampled': wandb.Image(torch.clip( (pure_cldm.vae_decode(z) + 1) / 2, 0,1), caption=f'sampled_img'),
                                     f'sampling_train_FINAL_VIS/train_prompt': wandb.Image(log_txt_as_img((256, 256), log_prompt), caption=f'prompt'),
                                     })
-                        wandb.log({f'sampling_train_FINAL_VIS/train_all': wandb.Image(torch.concat([log_lq, log_clean, (pure_cldm.vae_decode(z) + 1) / 2, log_gt], dim=2), caption='lq_clean_sample,gt')})
+                        wandb.log({f'sampling_train_FINAL_VIS/train_all': wandb.Image(torch.concat([log_lq, log_clean, torch.clip((pure_cldm.vae_decode(z) + 1) / 2, 0,1) , log_gt], dim=2), caption='lq_clean_sample,gt')})
 
 
                 # put models back to training 
@@ -547,10 +548,10 @@ def main(args):
                             wandb.log({ f'sampling_val_FINAL_VIS/val_gt': wandb.Image((val_log_gt + 1) / 2, caption=f'gt_img'),
                                         f'sampling_val_FINAL_VIS/val_lq': wandb.Image(val_log_lq, caption=f'lq_img'),
                                         f'sampling_val_FINAL_VIS/val_cleaned': wandb.Image(val_log_clean, caption=f'cleaned_img'),
-                                        f'sampling_val_FINAL_VIS/val_sampled': wandb.Image((pure_cldm.vae_decode(val_z) + 1) / 2, caption=f'sampled_img'),
+                                        f'sampling_val_FINAL_VIS/val_sampled': wandb.Image(torch.clip((pure_cldm.vae_decode(val_z) + 1) / 2, 0, 1), caption=f'sampled_img'),
                                         f'sampling_val_FINAL_VIS/val_prompt': wandb.Image(log_txt_as_img((256, 256), val_log_prompt), caption=f'prompt'),
                                     })
-                            wandb.log({f'sampling_val_FINAL_VIS/val_all': wandb.Image(torch.concat([val_log_lq, val_log_clean, (pure_cldm.vae_decode(val_z) + 1) / 2, val_log_gt], dim=2), caption='lq_clean_sample,gt')})
+                            wandb.log({f'sampling_val_FINAL_VIS/val_all': wandb.Image(torch.concat([val_log_lq, val_log_clean, torch.clip((pure_cldm.vae_decode(val_z) + 1) / 2, 0, 1), val_log_gt], dim=2), caption='lq_clean_sample,gt')})
 
                     # put models back to training 
                     for model in models.values():

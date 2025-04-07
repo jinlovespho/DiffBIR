@@ -148,9 +148,9 @@ def load_model(accelerator, device, args, cfg):
     if cfg.exp_args['resume_ckpt_dir'] is not None:
 
         # set ckpt path
-        ckpt_dir = f"{cfg.exp_args['resume_ckpt_dir']}/checkpoints"
+        ckpt_dir = f"{cfg.exp_args['resume_ckpt_dir']}"
         ckpts = sorted(os.listdir(ckpt_dir))
-        ckpt_path = f"{ckpt_dir}/{ckpts[-3]}"        
+        ckpt_path = f"{ckpt_dir}/{ckpts[-1]}"        
         ckpt=torch.load(ckpt_path, map_location="cpu")
 
 
