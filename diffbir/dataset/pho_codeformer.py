@@ -153,19 +153,11 @@ class CodeformerDataset(data.Dataset):
 # PHO - LOL.. this solves it! :)
 def collate_fn(batch):
 
-    gt, lq, _, text, bbox, poly, text_enc, img_name = zip(*batch)
+    gt, lq, prompt, text, bbox, poly, text_enc, img_name = zip(*batch)
 
     # Convert lists to tensors if possible
     gt = torch.stack([torch.tensor(x) for x in gt])
     lq = torch.stack([torch.tensor(x) for x in lq])
-
-    prompts=[]
-    # preprocess prompt 
-    for i in range(len(text)):
-        caption = [f'"{txt}"' for txt in text[i]]
-        prompt = f"A high-quality photo containing the word {', '.join(caption) }."
-        prompts.append(prompt)
-
     
     text_enc_tensor=[]
     # preprocess text_enc
@@ -179,5 +171,5 @@ def collate_fn(batch):
         poly_tensor.append(torch.tensor(np.array(poly[i]), dtype=torch.float32))
         
 
-    return gt, lq, list(prompts), list(text), list(bbox), list(poly_tensor), list(text_enc_tensor), list(img_name)
+    return gt, lq, list(prompt), list(text), list(bbox), list(poly_tensor), list(text_enc_tensor), list(img_name)
 

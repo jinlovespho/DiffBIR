@@ -45,7 +45,7 @@ def main(args):
 
 
     # load models
-    models = initialize.load_model(accelerator, device, args, cfg)
+    models, resume_ckpt_path = initialize.load_model(accelerator, device, args, cfg)
     
 
     # set training params
@@ -87,7 +87,7 @@ def main(args):
         print(f"Num val_dataset: {len(val_ds):,}")
         print(f'Loaded models: {list(models.keys())}')
         print(f'Finetuning Method: {cfg.exp_args.finetuning_method}')
-        print(f'Resume training ckpt: ', cfg.exp_args.resume_ckpt)
+        print(f'Resume training ckpt: ', resume_ckpt_path)
         print('='*50)
 
 
@@ -125,10 +125,6 @@ def main(args):
             gt = rearrange(gt, "b h w c -> b c h w").contiguous().float()   # b 3 512 512
             lq = rearrange(lq, "b h w c -> b c h w").contiguous().float()   # b 3 512 512
             train_bs = gt.shape[0]
-
-
-            # use null prompt for now
-            train_prompt=["" for i in range(train_bs)]
 
 
             # # JLP - set box format to xywh and visualize box
@@ -403,14 +399,13 @@ def main(args):
                     # load val data
                     to(val_batch, device)
                     val_batch = batch_transform(val_batch)
-                    val_gt, val_lq, _, val_texts, val_boxes, val_polys, val_text_encs, val_img_name = val_batch 
+                    val_gt, val_lq, val_prompt, val_texts, val_boxes, val_polys, val_text_encs, val_img_name = val_batch 
                     val_gt = rearrange(val_gt, "b h w c -> b c h w").contiguous().float()   # b 3 512 512
                     val_lq = rearrange(val_lq, "b h w c -> b c h w").contiguous().float()
                     val_bs, _, val_H, val_W = val_gt.shape
 
 
-                    # use null prompt for validation for now
-                    val_prompt=["" for i in range(val_bs)]
+                    # val_prompt is null prompts !!
 
 
                     # put models on evaluation for sampling

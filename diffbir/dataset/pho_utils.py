@@ -214,7 +214,6 @@ def load_file_list(file_list_path: str, data_args=None):
                 boxes=[]
                 texts=[]
                 text_encs=[]
-                prompts=[]
                 polys=[]
 
                 # JLP vis
@@ -266,10 +265,6 @@ def load_file_list(file_list_path: str, data_args=None):
                         polys.append(poly_scaled)
 
 
-                        # process prompts
-                        prompt=""
-                        prompts.append(prompt)
-
                         # img0 = cv2.imread(gt_path)  # 512 512 3
                         # x,y,w,h = box_xywh
                         # cv2.rectangle(img0, (x,y), (x+w, y+h), (0,255,0), 2)
@@ -283,9 +278,19 @@ def load_file_list(file_list_path: str, data_args=None):
                 if len(boxes) == 0 or len(polys) == 0:
                     continue
             
-                    
+
+                # process prompt
+                if data_args['use_gtprompt']:
+                    caption = [f'"{txt}"' for txt in texts]
+                    # prompt = f"A high-quality photo containing the word {', '.join(caption) }."
+                    prompt = f"A realistic scene where the texts {', '.join(caption) } appear clearly on signs, boards, buildings, or other objects."
+                else:
+                    prompt=""
+                
+
+
                 files.append({"image_path": gt_path, 
-                              "prompt": prompts, 
+                              "prompt": prompt, 
                               "text": texts, 
                               "bbox": boxes,
                               'poly': polys,

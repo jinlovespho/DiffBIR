@@ -170,9 +170,11 @@ def load_model(accelerator, device, args, cfg):
         # Move models to the correct device (if needed)
         for model in loaded_models.values():
             model.to(device)
+        
+        return loaded_models, ckpt_path
 
 
-    return loaded_models
+    return loaded_models, None
 
 
 def set_training_params(accelerator, models, cfg):
@@ -253,6 +255,14 @@ def set_training_params(accelerator, models, cfg):
                     train_params.append(param)
                 else:
                     param.requires_grad = False
+            
+            elif cfg.exp_args.finetuning_method == 'ctrlnet_and_unetAttn_and_testr':
+                if 'controlnet' in name or ('unet' in name and 'attn' in name) or ('testr' in name):
+                    param.requires_grad = True
+                    train_model_names.append(name)
+                    train_params.append(param)
+                else:
+                    param.requires_grad = False
 
 
 
@@ -262,7 +272,8 @@ def set_training_params(accelerator, models, cfg):
         chunk_size = 10  # Adjust based on readability
         for i in range(0, len(train_model_names), chunk_size):
             print(train_model_names[i:i+chunk_size])  # Print in smaller chunks
-        
+    
+    
     return train_params, train_model_names
 
 
