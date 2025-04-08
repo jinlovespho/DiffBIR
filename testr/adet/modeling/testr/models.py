@@ -29,11 +29,11 @@ class TESTR(nn.Module):
     Same as :class:`detectron2.modeling.ProposalNetwork`.
     Use one stage detector and a second stage for instance-wise prediction.
     """
-    def __init__(self, cfg, backbone):
+    def __init__(self, cfg):
         super().__init__()
         self.device = torch.device(cfg.MODEL.DEVICE)
 
-        self.backbone = backbone
+        # self.backbone = backbone
         
         # fmt: off
         self.d_model                 = cfg.MODEL.TRANSFORMER.HIDDEN_DIM
@@ -108,29 +108,43 @@ class TESTR(nn.Module):
         
 
         # JLP - extract feat channel
+        # num_channels = [1280, 1280, 640, 320]
+        # self.diff_feat_proj = nn.ModuleList([
+        #         nn.Sequential(
+        #         nn.Conv2d(num_channels[0], self.d_model, kernel_size=1),
+        #         nn.GroupNorm(32, self.d_model),
+        #         ),
+
+        #         nn.Sequential(
+        #         nn.Conv2d(num_channels[1], self.d_model, kernel_size=1),
+        #         nn.GroupNorm(32, self.d_model),
+        #         ),
+
+        #         nn.Sequential(
+        #         nn.Conv2d(num_channels[2], self.d_model, kernel_size=1),
+        #         nn.GroupNorm(32, self.d_model),
+        #         ),
+
+        #         nn.Sequential(
+        #         nn.Conv2d(num_channels[3], self.d_model, kernel_size=1),
+        #         nn.GroupNorm(32, self.d_model),
+        #         ),
+        #     ]
+        # )
+
         num_channels = [1280, 1280, 640, 320]
-        self.input_proj = nn.ModuleList([
-                nn.Sequential(
-                nn.Conv2d(num_channels[0], self.d_model, kernel_size=1),
+        self.diff_feat_proj = nn.ModuleList([
+            nn.Sequential(
+                nn.Conv2d(num_channels[i], self.d_model, kernel_size=1),     # 1x1 projection
                 nn.GroupNorm(32, self.d_model),
-                ),
+                nn.GELU(),
 
-                nn.Sequential(
-                nn.Conv2d(num_channels[1], self.d_model, kernel_size=1),
+                nn.Conv2d(self.d_model, self.d_model, kernel_size=3, padding=1),  # 3x3 conv
                 nn.GroupNorm(32, self.d_model),
-                ),
-
-                nn.Sequential(
-                nn.Conv2d(num_channels[2], self.d_model, kernel_size=1),
-                nn.GroupNorm(32, self.d_model),
-                ),
-
-                nn.Sequential(
-                nn.Conv2d(num_channels[3], self.d_model, kernel_size=1),
-                nn.GroupNorm(32, self.d_model),
-                ),
-            ]
-        )
+                nn.GELU(),
+            )
+            for i in range(len(num_channels))
+        ])
 
         self.aux_loss = cfg.MODEL.TRANSFORMER.AUX_LOSS
 
@@ -140,7 +154,7 @@ class TESTR(nn.Module):
         self.bbox_class.bias.data = torch.ones(self.num_classes) * bias_value
         nn.init.constant_(self.ctrl_point_coord.layers[-1].weight.data, 0)
         nn.init.constant_(self.ctrl_point_coord.layers[-1].bias.data, 0)
-        for proj in self.input_proj:
+        for proj in self.diff_feat_proj:
             nn.init.xavier_uniform_(proj[0].weight, gain=1)
             nn.init.constant_(proj[0].bias, 0)
 
@@ -221,7 +235,7 @@ class TESTR(nn.Module):
         masks = []
         for l, feat in enumerate(extracted_feats):
             b, _, feat_H, feat_W = feat.shape
-            srcs.append(self.input_proj[l](feat))
+            srcs.append(self.diff_feat_proj[l](feat))
             masks.append(torch.zeros(b, feat_H, feat_W).to(bool).to(feat.device))
 
 

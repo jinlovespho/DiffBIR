@@ -19,9 +19,9 @@ def load_experiment_settings(accelerator, cfg):
     exp_name = f"{cfg.exp_args.log_user}_{cfg.exp_args.log_server}_{cfg.exp_args.log_gpu}_{cfg.exp_args.mode}_DATA_{datasets}_MODEL_{cfg.exp_args.model_name}_FT_{cfg.exp_args.finetuning_method}_bs{cfg.train.batch_size}_lr{cfg.train.learning_rate}_{cfg.exp_args.log_additional_msg}"
     
     if accelerator.is_main_process:
-        print('=======================================================================================================')
+        print('='*130)
         print('EXPERIMENT NAME: ', exp_name)
-        print('=======================================================================================================')
+        print('='*130)
 
     # setup an experiment folder
     exp_dir = cfg.train.exp_dir
@@ -135,7 +135,20 @@ def load_model(accelerator, device, args, cfg):
         config_testr.merge_from_file(args.config_testr)
         config_testr.freeze()
 
+        # load testr model
         detector = TransformerDetector(config_testr)
+
+        # load testr pretrained weights
+        if cfg.exp_args.testr_ckpt_dir is not None:
+            ckpt = torch.load(cfg.exp_args.testr_ckpt_dir, map_location="cpu")
+            load_result = detector.load_state_dict(ckpt['model'], strict=False)
+            
+            if accelerator.is_main_process:
+                print("Loaded TESTR checkpoint keys:")
+                print(" - Missing keys:", load_result.missing_keys)
+                # print(" - Unexpected keys:", load_result.unexpected_keys)
+
+
         loaded_models['testr_detector'] = detector.train().to(device)
     
     # add other models
@@ -152,12 +165,6 @@ def load_model(accelerator, device, args, cfg):
         ckpts = sorted(os.listdir(ckpt_dir))
         ckpt_path = f"{ckpt_dir}/{ckpts[-1]}"        
         ckpt=torch.load(ckpt_path, map_location="cpu")
-
-
-        # print
-        if accelerator.is_main_process:
-            print('RESUME CKPT: ', ckpt_path)
-
 
         # Efficient weight loading with missing key handling
         for model_name, model in loaded_models.items():

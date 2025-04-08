@@ -160,7 +160,7 @@ def main(args):
             diff_loss, extracted_feats = diffusion.p_losses(models['cldm'], z_0, t, cond_aug)
             
 
-            # =========================== OCR ===========================
+            # ================================= OCR =================================
             if cfg.exp_args.model_name == 'diffbir_onlybox' or cfg.exp_args.model_name == 'diffbir_testr':
 
                 # process annotations for OCR training loss
@@ -188,11 +188,18 @@ def main(args):
                     else:
                         ocr_losses[ocr_key]=[ocr_val.item()]
 
+                # TOTAL LOSS FUNCTION
+                total_loss = diff_loss + ocr_tot_loss      
 
-            # TOTAL LOSS FUNCTION
-            total_loss = diff_loss + ocr_tot_loss
+
+            # ================================= NO OCR =================================
+            else:
+                # TOTAL LOSS FUNCTION
+                total_loss = diff_loss
+                ocr_tot_loss=torch.tensor(0).cuda()
 
 
+            
             # calculate gradient and update model
             opt.zero_grad()
             accelerator.backward(total_loss)

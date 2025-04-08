@@ -157,8 +157,10 @@ dataset:
         }
 
     
+
 batch_transform:
   target: diffbir.dataset.batch_transform.IdentityBatchTransform
+
 
 
 # training args
@@ -181,11 +183,13 @@ train:
   exp_dir: ./model_ckpts
 
 
+
 val:
   num_workers: 4
   batch_size: 6
   log_num_val_img: 6
   log_image_every: 500
+
 
 
 log_args:
@@ -194,14 +198,17 @@ log_args:
   wandb_proj_name: DiffBIR_OCR_finetuning
 
 
+
 exp_args:
-  log_additional_msg: gtprompt
+  log_additional_msg: GTprompt_pretrainedTestr
   log_user: pho
   log_server: server5
   log_gpu: gpu1
   # choose from [TRAIN, INFERENCE]
   mode: TRAIN
-  model_name: diffbir_testr
+  model_name: diffbir
+  # ./weights/totaltext_testr_R_50_polygon.pth
+  testr_ckpt_dir:
   # finetuning_method: only_ctrlnet, only_testr_detector, ctrlnet_and_only_testr_detector, 
   # finetuning_method: testr, ctrlnet_and_testr, ctrlnet_and_unetAttn, ctrlnet_and_unetAttn_and_testr
   finetuning_method: ctrlnet_and_unetAttn
