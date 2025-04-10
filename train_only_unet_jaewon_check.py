@@ -46,7 +46,11 @@ def main(args):
 
     # load models
     models, resume_ckpt_path = initialize.load_model(accelerator, device, args, cfg)
-    
+
+
+    # manual pop swinir model as we dont need it 
+    models.pop('swinir')
+
 
     # set training params
     train_params, train_model_names = initialize.set_training_params(accelerator, models, cfg)
@@ -124,7 +128,7 @@ def main(args):
             batch = batch_transform(batch)
             gt, lq, train_prompt, texts, boxes, polys, text_encs, img_name = batch
             gt = rearrange(gt, "b h w c -> b c h w").contiguous().float()   # b 3 512 512
-            lq = rearrange(lq, "b h w c -> b c h w").contiguous().float()   # b 3 512 512
+            # lq = rearrange(lq, "b h w c -> b c h w").contiguous().float()   # b 3 512 512
             train_bs = gt.shape[0]
 
 
@@ -150,8 +154,9 @@ def main(args):
             # prepare VAE, condition, timestep
             with torch.no_grad():
                 z_0 = pure_cldm.vae_encode(gt)                              # b 4 64 64
-                clean = models['swinir'](lq)                                          # b 3 512 512
-                cond = pure_cldm.prepare_condition(clean, train_prompt)     # cond['c_txt'], cond['c_img']
+                # clean = models['swinir'](lq)                                          # b 3 512 512
+                # cond = pure_cldm.prepare_condition(clean, train_prompt)     # cond['c_txt'], cond['c_img']
+                cond = dict(c_txt=pure_cldm.clip.encode(train_prompt))          # b 77 768
                 # noise augmentation
                 cond_aug = copy.deepcopy(cond)
 
@@ -272,10 +277,10 @@ def main(args):
 
                 # set number of training images to log
                 N = cfg.train.log_num_train_img
-                log_clean = clean[:N]                                       # b 3 512 512
+                # log_clean = clean[:N]                                       # b 3 512 512
                 log_cond = {k: v[:N] for k, v in cond.items()}              
                 log_cond_aug = {k: v[:N] for k, v in cond_aug.items()}
-                log_gt, log_lq = gt[:N], lq[:N]                             # b  3 512 512
+                log_gt = gt[:N]
                 log_prompt = train_prompt[:N]
 
 
@@ -380,12 +385,13 @@ def main(args):
 
                         # log sampling training images
                         wandb.log({ f'sampling_train_FINAL_VIS/train_gt': wandb.Image((log_gt + 1) / 2, caption=f'gt_img'),
-                                    f'sampling_train_FINAL_VIS/train_lq': wandb.Image(log_lq, caption=f'lq_img'),
-                                    f'sampling_train_FINAL_VIS/train_cleaned': wandb.Image(log_clean, caption=f'cleaned_img'),
+                                    # f'sampling_train_FINAL_VIS/train_lq': wandb.Image(log_lq, caption=f'lq_img'),
+                                    # f'sampling_train_FINAL_VIS/train_cleaned': wandb.Image(log_clean, caption=f'cleaned_img'),
                                     f'sampling_train_FINAL_VIS/train_sampled': wandb.Image(torch.clip( (pure_cldm.vae_decode(z) + 1) / 2, 0,1), caption=f'sampled_img'),
                                     f'sampling_train_FINAL_VIS/train_prompt': wandb.Image(log_txt_as_img((256, 256), log_prompt), caption=f'prompt'),
                                     })
-                        wandb.log({f'sampling_train_FINAL_VIS/train_all': wandb.Image(torch.concat([log_lq, log_clean, torch.clip((pure_cldm.vae_decode(z) + 1) / 2, 0,1) , log_gt], dim=2), caption='lq_clean_sample,gt')})
+                        # wandb.log({f'sampling_train_FINAL_VIS/train_all': wandb.Image(torch.concat([log_lq, log_clean, torch.clip((pure_cldm.vae_decode(z) + 1) / 2, 0,1) , log_gt], dim=2), caption='lq_clean_sample,gt')})
+                        wandb.log({f'sampling_train_FINAL_VIS/train_all': wandb.Image(torch.concat([torch.clip((pure_cldm.vae_decode(z) + 1) / 2, 0,1) , log_gt], dim=2), caption='sample,gt')})
 
 
                 # put models back to training 
@@ -409,7 +415,7 @@ def main(args):
                     val_batch = batch_transform(val_batch)
                     val_gt, val_lq, val_prompt, val_texts, val_boxes, val_polys, val_text_encs, val_img_name = val_batch 
                     val_gt = rearrange(val_gt, "b h w c -> b c h w").contiguous().float()   # b 3 512 512
-                    val_lq = rearrange(val_lq, "b h w c -> b c h w").contiguous().float()
+                    # val_lq = rearrange(val_lq, "b h w c -> b c h w").contiguous().float()
                     val_bs, _, val_H, val_W = val_gt.shape
 
 
@@ -424,14 +430,15 @@ def main(args):
                     # prepare vae, condition
                     with torch.no_grad():
                         # val_z_0 = pure_cldm.vae_encode(val_gt)
-                        val_clean = models['swinir'](val_lq)
-                        val_cond = pure_cldm.prepare_condition(val_clean, val_prompt)
+                        # val_clean = models['swinir'](val_lq)
+                        # val_cond = pure_cldm.prepare_condition(val_clean, val_prompt)
+                        val_cond = dict(c_txt=pure_cldm.clip.encode(val_prompt))          # b 77 768
 
                         # set number of val imgs to log
                         M = cfg.val.log_num_val_img
-                        val_log_clean = val_clean[:M]
+                        # val_log_clean = val_clean[:M]
                         val_log_cond = {k: v[:M] for k, v in val_cond.items()}
-                        val_log_gt, val_log_lq = val_gt[:M], val_lq[:M]
+                        val_log_gt = val_gt[:M]
                         val_log_prompt = val_prompt[:M]
                         
                         # sampling
@@ -549,12 +556,13 @@ def main(args):
                             
                             # log sampling val images 
                             wandb.log({ f'sampling_val_FINAL_VIS/val_gt': wandb.Image((val_log_gt + 1) / 2, caption=f'gt_img'),
-                                        f'sampling_val_FINAL_VIS/val_lq': wandb.Image(val_log_lq, caption=f'lq_img'),
-                                        f'sampling_val_FINAL_VIS/val_cleaned': wandb.Image(val_log_clean, caption=f'cleaned_img'),
+                                        # f'sampling_val_FINAL_VIS/val_lq': wandb.Image(val_log_lq, caption=f'lq_img'),
+                                        # f'sampling_val_FINAL_VIS/val_cleaned': wandb.Image(val_log_clean, caption=f'cleaned_img'),
                                         f'sampling_val_FINAL_VIS/val_sampled': wandb.Image(torch.clip((pure_cldm.vae_decode(val_z) + 1) / 2, 0, 1), caption=f'sampled_img'),
                                         f'sampling_val_FINAL_VIS/val_prompt': wandb.Image(log_txt_as_img((256, 256), val_log_prompt), caption=f'prompt'),
                                     })
-                            wandb.log({f'sampling_val_FINAL_VIS/val_all': wandb.Image(torch.concat([val_log_lq, val_log_clean, torch.clip((pure_cldm.vae_decode(val_z) + 1) / 2, 0, 1), val_log_gt], dim=2), caption='lq_clean_sample,gt')})
+                            # wandb.log({f'sampling_val_FINAL_VIS/val_all': wandb.Image(torch.concat([val_log_lq, val_log_clean, torch.clip((pure_cldm.vae_decode(val_z) + 1) / 2, 0, 1), val_log_gt], dim=2), caption='lq_clean_sample,gt')})
+                            wandb.log({f'sampling_val_FINAL_VIS/val_all': wandb.Image(torch.concat([torch.clip((pure_cldm.vae_decode(val_z) + 1) / 2, 0, 1), val_log_gt], dim=2), caption='sample,gt')})
 
                     # put models back to training 
                     for model in models.values():

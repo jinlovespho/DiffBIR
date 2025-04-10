@@ -149,7 +149,7 @@ def load_model(accelerator, device, args, cfg):
                 # print(" - Unexpected keys:", load_result.unexpected_keys)
 
 
-        loaded_models['testr_detector'] = detector.train().to(device)
+        loaded_models['testr'] = detector.train().to(device)
     
     # add other models
     elif cfg.exp_args.model_name == '':

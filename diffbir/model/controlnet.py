@@ -53,6 +53,7 @@ class ControlledUnetModel(UNetModel):
                 extracted_feats.append(h.detach())
 
         h = h.type(x.dtype)
+    
         return self.out(h), extracted_feats
 
 

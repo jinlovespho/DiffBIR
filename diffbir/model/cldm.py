@@ -158,10 +158,16 @@ class ControlLDM(nn.Module):
         )
 
     def forward(self, x_noisy, t, cond):
-        c_txt = cond["c_txt"]
-        c_img = cond["c_img"]
-        control = self.controlnet(x=x_noisy, hint=c_img, timesteps=t, context=c_txt)
-        control = [c * scale for c, scale in zip(control, self.control_scales)]
+
+        if 'c_img' in cond.keys():
+            c_txt = cond["c_txt"]
+            c_img = cond["c_img"]
+            control = self.controlnet(x=x_noisy, hint=c_img, timesteps=t, context=c_txt)
+            control = [c * scale for c, scale in zip(control, self.control_scales)]
+        else:
+            c_txt = cond["c_txt"]
+            control=None
+        
         eps, extracted_feats = self.unet(
             x=x_noisy,
             timesteps=t,
@@ -169,6 +175,7 @@ class ControlLDM(nn.Module):
             control=control,
             only_mid_control=False,
         )
+
         return eps, extracted_feats 
 
     def cast_dtype(self, dtype: torch.dtype) -> "ControlLDM":

@@ -170,6 +170,7 @@ class Diffusion(nn.Module):
         
 
     def p_losses(self, model, z_0, t, cond):
+
         noise = torch.randn_like(z_0)
         z_t = self.q_sample(z_0=z_0, t=t, noise=noise)
         model_output, extracted_feats = model(z_t, t, cond)

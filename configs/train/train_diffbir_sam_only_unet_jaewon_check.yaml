@@ -125,7 +125,7 @@ dataset:
         # xywh_unscaled, xyxy_scaled, cxcywh_scaled
         'bbox_format': 'cxcywh_scaled', 
         'model_img_size': [512, 512],
-        'use_gtprompt': True,
+        'use_gtprompt': False,
         }
   
   # validation data config
@@ -153,7 +153,7 @@ dataset:
         # xywh_unscaled, xyxy_scaled, cxcywh_scaled
         'bbox_format': 'cxcywh_scaled',
         'model_img_size': [512, 512],
-        'use_gtprompt': True,
+        'use_gtprompt': False,
         }
 
     
@@ -176,8 +176,8 @@ train:
   ckpt_every: 20000
   log_loss_every: 50
   log_image_every: 500
-  batch_size: 3
-  log_num_train_img: 3
+  batch_size: 5
+  log_num_train_img: 5
   learning_rate: 1e-4
   # experiment save directory path
   exp_dir: ./model_ckpts
@@ -201,18 +201,18 @@ log_args:
 
 exp_args:
   # GTprompt_pretrainedTestr
-  log_additional_msg: GTpromptValidation
+  log_additional_msg: NULLprompt_jaewonOnlyUnet_testrPretrained
   log_user: pho
   log_server: server5
-  log_gpu: gpu1
+  log_gpu: gpu2
   # choose from [TRAIN, INFERENCE]
   mode: TRAIN
-  model_name: diffbir
+  model_name: diffbir_testr
   # ./weights/totaltext_testr_R_50_polygon.pth
-  testr_ckpt_dir:
+  testr_ckpt_dir: ./weights/totaltext_testr_R_50_polygon.pth
   # finetuning_method: only_ctrlnet, only_testr_detector, ctrlnet_and_only_testr_detector, 
   # finetuning_method: testr, ctrlnet_and_testr, ctrlnet_and_unetAttn, ctrlnet_and_unetAttn_and_testr
-  finetuning_method: ctrlnet_and_unetAttn
+  finetuning_method: testr
   unet_feat_sampling_timestep: [10,20,30,40,50]
   # ./model_ckpts/pho_server5_gpu3_TRAIN_DATA_sam_MODEL_diffbir_testr_FT_ctrlnet_and_testr_bs3_lr0.0001_nullprompt
   resume_ckpt_dir: 
