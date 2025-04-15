@@ -73,6 +73,8 @@ def load_file_list(file_list_path: str, data_args=None):
     mode = data_args['mode']
     datasets = data_args['datasets']
     ann_path = data_args['ann_path']
+    use_gtprompt = data_args['use_gtprompt']
+    model_H, model_W = data_args['model_img_size']
 
     files = []
     for dataset in datasets:
@@ -209,8 +211,6 @@ def load_file_list(file_list_path: str, data_args=None):
                 else:
                     continue
 
-                model_H, model_W = data_args['model_img_size']
-
                 boxes=[]
                 texts=[]
                 text_encs=[]
@@ -280,7 +280,7 @@ def load_file_list(file_list_path: str, data_args=None):
             
 
                 # process prompt
-                if data_args['use_gtprompt']:
+                if use_gtprompt:
                     caption = [f'"{txt}"' for txt in texts]
                     # prompt = f"A high-quality photo containing the word {', '.join(caption) }."
                     prompt = f"A realistic scene where the texts {', '.join(caption) } appear clearly on signs, boards, buildings, or other objects."
@@ -295,11 +295,134 @@ def load_file_list(file_list_path: str, data_args=None):
                               "bbox": boxes,
                               'poly': polys,
                               'text_enc': text_encs, 
-                              "img_name": img_id})         
+                              "img_name": img_id})     
 
+
+        elif dataset == 'sam_clean':
+            
+            # load json 
+            json_path = ann_path 
+            with open(json_path, 'r') as f:
+                json_data = json.load(f)
+                json_data = sorted(json_data.items())
+            
+
+            # split train and val ratio 10:1
+            split_index = int(len(json_data) * 10 / 11)
+            if mode == 'TRAIN':
+                json_data = dict(json_data[:split_index])
+            elif mode == 'VAL':
+                json_data = dict(json_data[split_index:])
+
+
+            # image path 
+            imgs_path = f'{file_list_path}/images'
+            imgs = sorted(os.listdir(imgs_path))
+
+
+            for img in imgs:
+                gt_path = f'{imgs_path}/{img}'
+
+                img_id = img.split('.')[0]
+                if img_id in json_data.keys():
+                    img_ann = json_data[img_id]['0']['text_instances']
+                else:
+                    continue
+
+                
+                # # JLP vis
+                # img0 = cv2.imread(gt_path)  # 512 512 3
+                # img0_box = img0.copy()
+                # img0_poly = img0.copy()
+
+
+                boxes=[]
+                texts=[]
+                text_encs=[]
+                polys=[]
+
+                for ann in img_ann:
+
+                    # process text 
+                    text = ann['text']
+                    count=0
+                    for char in text:
+                        # only allow OCR english vocab: range(32,127)
+                        if 32 <= ord(char) and ord(char) < 127:
+                            count+=1
+                            # print(char, ord(char))
+                    if count == len(text) and count < 26:
+                        texts.append(text)
+                        text_encs.append(encode(text))
+                        assert text == decode(encode(text)), 'check text encoding !'
+                    else:
+                        continue
+
+
+                    # process box
+                    box_xyxy = ann['bbox']
+                    x1,y1,x2,y2 = box_xyxy
+                    box_xywh = [ x1, y1, x2-x1, y2-y1 ]
+                    box_xyxy_scaled = list(map(lambda x: x/model_H, box_xyxy))  # scale box coord to [0,1]
+                    x1,y1,x2,y2 = box_xyxy_scaled 
+                    box_cxcywh = [(x1+x2)/2, (y1+y2)/2, x2-x1, y2-y1]   # xyxy -> cxcywh
+                    # select box format
+                    if data_args['bbox_format'] == 'xywh_unscaled':
+                        processed_box = box_xywh
+                        processed_box = list(map(lambda x: int(x), processed_box))
+                    elif data_args['bbox_format'] == 'xyxy_scaled':
+                        processed_box = box_xyxy_scaled
+                        processed_box = list(map(lambda x: round(x,4), processed_box))
+                    elif data_args['bbox_format'] == 'cxcywh_scaled':
+                        processed_box = box_cxcywh
+                        processed_box = list(map(lambda x: round(x,4), processed_box))
+                    boxes.append(processed_box)
+
+
+                    # process polygons
+                    poly = np.array(ann['polygon']).astype(np.int32)    # 16 2
+                    # scale poly
+                    poly_scaled = poly / np.array([model_W, model_H])
+                    polys.append(poly_scaled)
+
+
+                    # # JLP VIS
+                    # img0 = cv2.imread(gt_path)  # 512 512 3
+                    # x,y,w,h = box_xywh
+                    # cv2.rectangle(img0_box, (x,y), (x+w, y+h), (0,255,0), 2)
+                    # cv2.polylines(img0_poly, [poly], True, (0,255,0), 2)
+                    # cv2.putText(img0_box, text, (poly[0][0], poly[0][1]-5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
+                    # cv2.putText(img0_poly, text, (poly[0][0], poly[0][1]-5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
+                    # cv2.imwrite('./img0_box.jpg', img0_box)
+                    # cv2.imwrite('./img0_poly.jpg', img0_poly)
+
+                assert len(boxes) == len(texts) == len(text_encs) == len(polys), f" Check loader!"
+
+                # if the filetered image has no bbox and texts, skip it
+                if len(boxes) == 0 or len(polys) == 0:
+                    continue
+
+                # process prompt
+                if use_gtprompt:
+                    caption = [f'"{txt}"' for txt in texts]
+                    # prompt = f"A high-quality photo containing the word {', '.join(caption) }."
+                    prompt = f"A realistic scene where the texts {', '.join(caption) } appear clearly on signs, boards, buildings, or other objects."
+                else:
+                    prompt=""
+
+
+                files.append({"image_path": gt_path, 
+                              "prompt": prompt, 
+                              "text": texts, 
+                              "bbox": boxes,
+                              'poly': polys,
+                              'text_enc': text_encs, 
+                              "img_name": img_id})     
+    
 
     if mode=='VAL':
-        files = random.sample(files, 24)
+        files = random.sample(files, 90)
+
     return files
 
 

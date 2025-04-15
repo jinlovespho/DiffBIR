@@ -201,21 +201,22 @@ log_args:
 
 exp_args:
   # GTprompt_pretrainedTestr
-  log_additional_msg: NULLpromptValidationSET
+  log_additional_msg: NULLpromptValidationSET_TEST_baseline
   log_user: pho
   log_server: server5
   log_gpu: gpu2
   # choose from [TRAIN, INFERENCE]
-  mode: TRAIN
+  mode: VAL
   model_name: diffbir
   # ./weights/totaltext_testr_R_50_polygon.pth
   testr_ckpt_dir:
   # finetuning_method: only_ctrlnet, only_testr_detector, ctrlnet_and_only_testr_detector, 
   # finetuning_method: testr, ctrlnet_and_testr, ctrlnet_and_unetAttn, ctrlnet_and_unetAttn_and_testr
-  finetuning_method: ctrlnet_and_unetAttn
+  finetuning_method: 
   unet_feat_sampling_timestep: [10,20,30,40,50]
   # ./model_ckpts/pho_server5_gpu3_TRAIN_DATA_sam_MODEL_diffbir_testr_FT_ctrlnet_and_testr_bs3_lr0.0001_nullprompt
-  resume_ckpt_dir: 
+  # resume_ckpt_dir: ./model_ckpts/pho_server5_gpu3_TRAIN_DATA_sam_MODEL_diffbir_testr_FT_ctrlnet_and_testr_bs3_lr0.0001_nullprompt_continue60k/0020000.pt
+  resume_ckpt_dir: ./model_ckpts/pho_server5_gpu1_TRAIN_DATA_sam_MODEL_diffbir_baseline_FT_ctrlnet_bs3_lr0.0001_nullprompt/0060000.pt
 
   
   

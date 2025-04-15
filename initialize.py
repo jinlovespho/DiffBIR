@@ -162,9 +162,9 @@ def load_model(accelerator, device, args, cfg):
 
         # set ckpt path
         ckpt_dir = f"{cfg.exp_args['resume_ckpt_dir']}"
-        ckpts = sorted(os.listdir(ckpt_dir))
-        ckpt_path = f"{ckpt_dir}/{ckpts[-1]}"        
-        ckpt=torch.load(ckpt_path, map_location="cpu")
+        # ckpts = sorted(os.listdir(ckpt_dir))
+        # ckpt_path = f"{ckpt_dir}/{ckpts[-1]}"        
+        ckpt=torch.load(ckpt_dir, map_location="cpu")
 
         # Efficient weight loading with missing key handling
         for model_name, model in loaded_models.items():
@@ -178,7 +178,7 @@ def load_model(accelerator, device, args, cfg):
         for model in loaded_models.values():
             model.to(device)
         
-        return loaded_models, ckpt_path
+        return loaded_models, ckpt_dir
 
 
     return loaded_models, None

@@ -35,6 +35,7 @@ class ControlledUnetModel(UNetModel):
         for module in self.input_blocks:
             h = module(h, emb, context)
             hs.append(h)
+        
         h = self.middle_block(h, emb, context)
 
         if control is not None:

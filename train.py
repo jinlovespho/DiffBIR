@@ -79,17 +79,21 @@ def main(args):
 
     # print Training Info
     if accelerator.is_main_process:
-        print('='*50)
+        print('='*100)
         print(f'Experiment name: {exp_name}')
+        print('-'*50)
+        print(f"Save ckpt directory: {exp_dir}")
         print(f"Training steps: {cfg.train.train_steps}")
-        print(f"Experiment directory: {exp_dir}")
+        print('-'*50)
         print(f"Num train_dataset: {len(train_ds):,}")
         print(f"Num val_dataset: {len(val_ds):,}")
+        print('-'*50)
         print(f'Loaded models: {list(models.keys())}')
         print(f'Finetuning Method: {cfg.exp_args.finetuning_method}')
+        print('-'*50)
         print(f'Resume training ckpt: ', resume_ckpt_path)
         print(f'OCR pretrained ckpt: {cfg.exp_args.testr_ckpt_dir}')
-        print('='*50)
+        print('='*100)
 
 
     # setup variables for monitoring/logging purposes:
@@ -113,11 +117,9 @@ def main(args):
         pbar = tqdm( iterable=None, disable=not accelerator.is_main_process, unit="batch", total=len(train_loader), )
         for batch in train_loader:
 
-
             # log basic info while training
             if accelerator.is_main_process and cfg.log_args.log_tool == 'wandb':
                 wandb.log({'global_step': global_step, 'epoch': epoch,'learning_rate': opt.param_groups[0]['lr'], })
-
 
             # load training data
             to(batch, device)
@@ -127,26 +129,6 @@ def main(args):
             lq = rearrange(lq, "b h w c -> b c h w").contiguous().float()   # b 3 512 512
             train_bs = gt.shape[0]
 
-
-            # # JLP - set box format to xywh and visualize box
-            # for i in range(cfg.train.batch_size):
-            #     vis_gt = gt[i]  # has range [-1,1]
-            #     vis_lq = lq[i]  # has range [0,1]
-            #     vis_gt = (vis_gt + 1) / 2.0 * 255.0
-            #     vis_lq = vis_lq * 255.0 
-            #     vis_gt = vis_gt.permute(1,2,0).detach().cpu().numpy().copy()
-            #     vis_lq = vis_lq.permute(1,2,0).detach().cpu().numpy().copy()
-            #     # draw box and text
-            #     for box_coord, txt in zip(boxes[i], texts[i]):
-            #         x,y,w,h = list(map(lambda x: int(x), box_coord)) 
-            #         cv2.rectangle(vis_gt, (x,y), (x+w,y+h), (0,255,0), 2)
-            #         cv2.putText(vis_gt, txt, (x,y-5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
-            #     # cv2.imwrite(f'./vis/textocr_img_{i}_gt.jpg', vis_gt[...,::-1])
-            #     # cv2.imwrite(f'./vis/textocr_img_{i}_lq.jpg', vis_lq[:,:,::-1])
-            #     cv2.imwrite(f'textocr_img_{i}_gt.jpg', vis_gt[...,::-1])
-            #     cv2.imwrite(f'textocr_img_{i}_lq.jpg', vis_lq[:,:,::-1])
-
-
             # prepare VAE, condition, timestep
             with torch.no_grad():
                 z_0 = pure_cldm.vae_encode(gt)                              # b 4 64 64
@@ -154,7 +136,6 @@ def main(args):
                 cond = pure_cldm.prepare_condition(clean, train_prompt)     # cond['c_txt'], cond['c_img']
                 # noise augmentation
                 cond_aug = copy.deepcopy(cond)
-
 
             # sample random training timesteps and obtain diffusion loss
             t = torch.randint(0, diffusion.num_timesteps, (train_bs,), device=device)
