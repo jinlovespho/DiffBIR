@@ -11,6 +11,7 @@ from diffbir.model import ControlLDM, Diffusion
 from diffbir.sampler import SpacedSampler
 import initialize
 from accelerate.utils import DistributedDataParallelKwargs
+import numpy as np
 
 
 def main(args):
@@ -22,10 +23,6 @@ def main(args):
     set_seed(231, device_specific=True)
     device = accelerator.device
     cfg = OmegaConf.load(args.config)
-
-
-    # load data
-    _, val_ds, _, val_loader = initialize.load_data(accelerator, cfg)
 
 
     # load models
@@ -40,79 +37,83 @@ def main(args):
 
     # setup accelerator    
     models = {k: accelerator.prepare(v) for k, v in models.items()}
-    val_loader = accelerator.prepare(val_loader)
 
 
     # unwrap cldm from accelerator for proper model saving
     pure_cldm: ControlLDM = accelerator.unwrap_model(models['cldm'])
 
 
-    # Validation
-    for val_batch in val_loader:
-
-        # load val data
-        to(val_batch, device)
-        val_gt, val_lq, val_prompt, val_texts, val_boxes, val_polys, val_text_encs, val_img_name = val_batch 
-        val_gt = rearrange(val_gt, "b h w c -> b c h w").contiguous().float()   # b 3 512 512
-        val_lq = rearrange(val_lq, "b h w c -> b c h w").contiguous().float()
-        val_bs, _, val_H, val_W = val_gt.shape
+    # Set dummy input
+    val_bs=1
+    val_lq = torch.rand(val_bs,3,512,512).to(device)    # input image
+    val_prompt=["" for _ in range(val_bs)]              # null prompt
 
 
-        # val_prompt is null prompts !!
+    # put models on evaluation for sampling
+    for model in models.values():
+        if isinstance(model, nn.Module):
+            model.eval()
 
 
-        # put models on evaluation for sampling
-        for model in models.values():
-            if isinstance(model, nn.Module):
-                model.eval()
+    # prepare vae, condition
+    with torch.no_grad():
+        val_clean = models['swinir'](val_lq)
+        val_cond = pure_cldm.prepare_condition(val_clean, val_prompt)
+
+        # Diffusion sampling
+        val_z, val_sampled_unet_feats = sampler.sample(     # 6 4 56 56
+            model=models['cldm'],
+            device=device,
+            steps=50,
+            x_size=(val_bs, 4, int(512/8), int(512/8)),   # manual shape adjustment
+            cond=val_cond,
+            uncond=None,
+            cfg_scale=1.0,
+            progress=accelerator.is_main_process,
+            cfg=cfg
+        )
 
 
-        # prepare vae, condition
-        with torch.no_grad():
-            val_clean = models['swinir'](val_lq)
-            val_cond = pure_cldm.prepare_condition(val_clean, val_prompt)
+        # ------------------------------- OCR -------------------------------
 
-            # set number of val imgs to log
-            M = cfg.val.log_num_val_img
-            val_log_clean = val_clean[:M]
-            val_log_cond = {k: v[:M] for k, v in val_cond.items()}
-            val_log_gt, val_log_lq = val_gt[:M], val_lq[:M]
-            val_log_prompt = val_prompt[:M]
+
+        # Warm-up
+        for i in range(5):
+            for _, _, unet_feats in val_sampled_unet_feats:
+                _ = models['testr'](unet_feats)
+        torch.cuda.synchronize()
+
+        
+        # set recording for OCR forward pass
+        starter, ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+
+
+        inference_time=[]
+        # evaluate diffusion features for different timesteps
+        for sampled_iter, sampled_timestep, unet_feats in val_sampled_unet_feats:
             
-            # sampling
-            val_z, val_sampled_unet_feats = sampler.sample(     # 6 4 56 56
-                model=models['cldm'],
-                device=device,
-                steps=50,
-                x_size=(val_bs, 4, int(val_H/8), int(val_W/8)),   # manual shape adjustment
-                cond=val_log_cond,
-                uncond=None,
-                cfg_scale=1.0,
-                progress=accelerator.is_main_process,
-                cfg=cfg
-            )
+
+            # start recording
+            starter.record()
 
 
-
-            # =========================== OCR ===========================
-           
-            # process annotations for OCR val loss 
-            val_targets=[]
-            for i in range(val_bs):
-                num_box=len(val_boxes[i])
-                tmp_dict={}
-                tmp_dict['labels'] = torch.tensor([0]*num_box).cuda()  # 0 for text
-                tmp_dict['boxes'] = torch.tensor(val_boxes[i]).cuda()
-                tmp_dict['texts'] = val_text_encs[i]
-                tmp_dict['ctrl_points'] = val_polys[i]
-                val_targets.append(tmp_dict)
+            # forward pass (the actual forward pass is implemented inside ./testr/adet/modeling/transformer_detector.py)
+            _ = models['testr'](unet_feats)
 
 
-            # evaluate diffusion features for different timesteps
-            for sampled_iter, sampled_timestep, unet_feats in val_sampled_unet_feats:
+            # end recording
+            ender.record()
+            torch.cuda.synchronize()
 
-                # OCR model forward pass
-                sampling_val_ocr_loss_dict, sampling_val_ocr_results = models['testr'](unet_feats, val_targets)
+            
+            # calcualate inference time
+            inf_time = starter.elapsed_time(ender)
+            inference_time.append(inf_time)
+
+
+        print('OCR inference time for each sampling steps: ', inference_time)           # mili-second
+        print('OCR Avg inference time: ', sum(inference_time)/len(inference_time))
+
 
 
 
