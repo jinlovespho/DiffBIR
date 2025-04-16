@@ -166,10 +166,10 @@ batch_transform:
 # training args
 train:
   # pretrained sd v2.1 path
-  sd_path: ./weights/v2-1_512-ema-pruned.ckpt
+  sd_path: 
   # stage 1 swinir path.
-  swinir_path: ./weights/codeformer_swinir.ckpt
-  resume: ./weights/DiffBIR_v2.1.pt
+  swinir_path: 
+  resume: 
   noise_aug_timestep: 0
   num_workers: 4
   train_steps: 60000
@@ -192,31 +192,13 @@ val:
 
 
 
-log_args:
-  log_tool: wandb
-  wandb_key: e32eed0c2509bf898b850b0065ab62345005fb73
-  wandb_proj_name: DiffBIR_OCR_finetuning
-
-
-
 exp_args:
-  # GTprompt_pretrainedTestr
-  log_additional_msg: NULLpromptValidationSET_TEST_baseline
-  log_user: pho
-  log_server: server5
-  log_gpu: gpu2
-  # choose from [TRAIN, INFERENCE]
   mode: VAL
-  model_name: diffbir
-  # ./weights/totaltext_testr_R_50_polygon.pth
+  model_name: diffbir_testr
   testr_ckpt_dir:
-  # finetuning_method: only_ctrlnet, only_testr_detector, ctrlnet_and_only_testr_detector, 
-  # finetuning_method: testr, ctrlnet_and_testr, ctrlnet_and_unetAttn, ctrlnet_and_unetAttn_and_testr
   finetuning_method: 
   unet_feat_sampling_timestep: [10,20,30,40,50]
-  # ./model_ckpts/pho_server5_gpu3_TRAIN_DATA_sam_MODEL_diffbir_testr_FT_ctrlnet_and_testr_bs3_lr0.0001_nullprompt
-  # resume_ckpt_dir: ./model_ckpts/pho_server5_gpu3_TRAIN_DATA_sam_MODEL_diffbir_testr_FT_ctrlnet_and_testr_bs3_lr0.0001_nullprompt_continue60k/0020000.pt
-  resume_ckpt_dir: ./model_ckpts/pho_server5_gpu1_TRAIN_DATA_sam_MODEL_diffbir_baseline_FT_ctrlnet_bs3_lr0.0001_nullprompt/0060000.pt
+  resume_ckpt_dir: 
 
   
   

@@ -5,7 +5,7 @@ import torch
 from torch.nn import functional as F
 import numpy as np
 
-from .utils import USMSharp, DiffJPEG, filter2D
+# from .utils import USMSharp, DiffJPEG, filter2D
 from .degradation import (
     random_add_gaussian_noise_pt,
     random_add_poisson_noise_pt,

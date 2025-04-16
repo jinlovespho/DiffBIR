@@ -12,37 +12,6 @@ import torch
 
 
 
-def load_experiment_settings(accelerator, cfg):
-
-    # EXPERIMENT NAME
-    datasets='_'.join((cfg.dataset.train.params.data_args['datasets']))
-    exp_name = f"{cfg.exp_args.log_user}_{cfg.exp_args.log_server}_{cfg.exp_args.log_gpu}_{cfg.exp_args.mode}_DATA_{datasets}_MODEL_{cfg.exp_args.model_name}_FT_{cfg.exp_args.finetuning_method}_bs{cfg.train.batch_size}_lr{cfg.train.learning_rate}_{cfg.exp_args.log_additional_msg}"
-    
-    if accelerator.is_main_process:
-        print('='*130)
-        print('EXPERIMENT NAME: ', exp_name)
-        print('='*130)
-
-    # setup an experiment folder
-    exp_dir = cfg.train.exp_dir
-    os.makedirs(exp_dir, exist_ok=True)
-    ckpt_dir = os.path.join(exp_dir, exp_name)
-    os.makedirs(ckpt_dir, exist_ok=True)
-
-    if accelerator.is_main_process:
-        # setup logging tool
-        if cfg.log_args.log_tool == 'wandb':
-            wandb.login(key=cfg.log_args.wandb_key)
-            wandb.init(project=cfg.log_args.wandb_proj_name, 
-                    name=exp_name, 
-                    config=argparse.Namespace(**OmegaConf.to_container(cfg, resolve=True))
-            )
-            return exp_dir, ckpt_dir, exp_name, None
-        elif cfg.log_args.log_tool == 'tensorboard':
-            writer = SummaryWriter(exp_dir)
-            return exp_dir, ckpt_dir, exp_name, writer
-
-
 def load_data(accelerator, cfg):
 
     # set dataset 
@@ -79,43 +48,44 @@ def load_model(accelerator, device, args, cfg):
 
     # default: load cldm, swinir
     cldm: ControlLDM = instantiate_from_config(cfg.model.cldm)
-    sd = torch.load(cfg.train.sd_path, map_location="cpu")["state_dict"]
-    unused, missing = cldm.load_pretrained_sd(sd)
-    if accelerator.is_main_process:
-        print(
-            f"strictly load pretrained SD weight from {cfg.train.sd_path}\n"
-            f"unused weights: {unused}\n"
-            f"missing weights: {missing}"
-        )
+    # sd = torch.load(cfg.train.sd_path, map_location="cpu")["state_dict"]
+    # unused, missing = cldm.load_pretrained_sd(sd)
+    # if accelerator.is_main_process:
+    #     print(
+    #         f"strictly load pretrained SD weight from {cfg.train.sd_path}\n"
+    #         f"unused weights: {unused}\n"
+    #         f"missing weights: {missing}"
+    #     )
 
-    if cfg.train.resume:
-        cldm.load_controlnet_from_ckpt(torch.load(cfg.train.resume, map_location="cpu"))
-        if accelerator.is_main_process:
-            print(
-                f"strictly load controlnet weight from checkpoint: {cfg.train.resume}"
-            )
-    else:
-        init_with_new_zero, init_with_scratch = cldm.load_controlnet_from_unet()
-        if accelerator.is_main_process:
-            print(
-                f"strictly load controlnet weight from pretrained SD\n"
-                f"weights initialized with newly added zeros: {init_with_new_zero}\n"
-                f"weights initialized from scratch: {init_with_scratch}"
-            )
+    # if cfg.train.resume:
+    #     cldm.load_controlnet_from_ckpt(torch.load(cfg.train.resume, map_location="cpu"))
+    #     if accelerator.is_main_process:
+    #         print(
+    #             f"strictly load controlnet weight from checkpoint: {cfg.train.resume}"
+    #         )
+    # else:
+    #     init_with_new_zero, init_with_scratch = cldm.load_controlnet_from_unet()
+    #     if accelerator.is_main_process:
+    #         print(
+    #             f"strictly load controlnet weight from pretrained SD\n"
+    #             f"weights initialized with newly added zeros: {init_with_new_zero}\n"
+    #             f"weights initialized from scratch: {init_with_scratch}"
+    #         )
+
 
     swinir: SwinIR = instantiate_from_config(cfg.model.swinir)
-    sd = torch.load(cfg.train.swinir_path, map_location="cpu")
-    if "state_dict" in sd:
-        sd = sd["state_dict"]
-    sd = {
-        (k[len("module.") :] if k.startswith("module.") else k): v
-        for k, v in sd.items()
-    }
-    swinir.load_state_dict(sd, strict=True)
-    for p in swinir.parameters():
-        p.requires_grad = False
-    if accelerator.is_main_process:
-        print(f"load SwinIR from {cfg.train.swinir_path}")
+    # sd = torch.load(cfg.train.swinir_path, map_location="cpu")
+    # if "state_dict" in sd:
+    #     sd = sd["state_dict"]
+    # sd = {
+    #     (k[len("module.") :] if k.startswith("module.") else k): v
+    #     for k, v in sd.items()
+    # }
+    # swinir.load_state_dict(sd, strict=True)
+    # for p in swinir.parameters():
+    #     p.requires_grad = False
+    # if accelerator.is_main_process:
+    #     print(f"load SwinIR from {cfg.train.swinir_path}")
 
     # set mode and cuda
     loaded_models['cldm'] = cldm.train().to(device)
