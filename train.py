@@ -29,8 +29,10 @@ def main(args):
     # set accelerator, seed, device, config
     kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
     accelerator = Accelerator(split_batches=False, kwargs_handlers=[kwargs])
-    set_seed(231, device_specific=True)
+    set_seed(25, device_specific=True)
     device = accelerator.device
+    gen = torch.Generator(device)
+    gen.manual_seed(25)
     cfg = OmegaConf.load(args.config)
 
 
@@ -264,7 +266,10 @@ def main(args):
                 for model in models.values():
                     if isinstance(model, nn.Module):
                         model.eval()
+                
 
+                pure_noise = torch.randn((N, 4, 64, 64), generator=gen, device=device, dtype=torch.float32)
+                # print(pure_noise)
 
                 # sampling 
                 with torch.no_grad():
@@ -276,8 +281,9 @@ def main(args):
                         cond=log_cond,
                         uncond=None,
                         cfg_scale=1.0,
+                        x_T = pure_noise,
                         progress=accelerator.is_main_process,
-                        cfg=cfg 
+                        cfg=cfg,
                     )
 
                     # OCR
@@ -414,6 +420,9 @@ def main(args):
                         val_log_cond = {k: v[:M] for k, v in val_cond.items()}
                         val_log_gt, val_log_lq = val_gt[:M], val_lq[:M]
                         val_log_prompt = val_prompt[:M]
+
+                        pure_noise = torch.randn((M, 4, 64, 64), generator=gen, device=device, dtype=torch.float32)
+                        # print(pure_noise)
                         
                         # sampling
                         val_z, val_sampled_unet_feats = sampler.sample(     # 6 4 56 56
@@ -424,6 +433,7 @@ def main(args):
                             cond=val_log_cond,
                             uncond=None,
                             cfg_scale=1.0,
+                            x_T = pure_noise,
                             progress=accelerator.is_main_process,
                             cfg=cfg
                         )

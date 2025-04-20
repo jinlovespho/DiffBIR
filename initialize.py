@@ -170,7 +170,7 @@ def load_model(accelerator, device, args, cfg):
         for model_name, model in loaded_models.items():
             if model_name in ckpt:
                 missing, unexpected = model.load_state_dict(ckpt[model_name], strict=False)
-                print(f"Loaded {model_name} | Missing keys: {len(missing)} | Unexpected keys: {len(unexpected)}")
+                print(f"RESUME TRAINING - Loaded {model_name} | Missing keys: {len(missing)} | Unexpected keys: {len(unexpected)}")
             else:
                 print(f"⚠️ Warning: No checkpoint found for {model_name}")
 
