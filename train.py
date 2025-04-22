@@ -95,6 +95,8 @@ def main(args):
         print('-'*50)
         print(f'Resume training ckpt: ', resume_ckpt_path)
         print(f'OCR pretrained ckpt: {cfg.exp_args.testr_ckpt_dir}')
+        print('-'*50)
+        print(f'OCR loss weight: ', cfg.exp_args.ocr_loss_weight)
         print('='*100)
 
 
@@ -173,7 +175,7 @@ def main(args):
                         ocr_losses[ocr_key]=[ocr_val.item()]
 
                 # TOTAL LOSS FUNCTION
-                total_loss = diff_loss + ocr_tot_loss      
+                total_loss = diff_loss + cfg.exp_args.ocr_loss_weight * ocr_tot_loss      
 
 
             # ================================= NO OCR =================================
