@@ -32,7 +32,6 @@ def main(args):
     set_seed(25, device_specific=True)
     device = accelerator.device
     gen = torch.Generator(device)
-    gen.manual_seed(25)
     cfg = OmegaConf.load(args.config)
 
 
@@ -269,7 +268,6 @@ def main(args):
                     if isinstance(model, nn.Module):
                         model.eval()
                 
-
                 pure_noise = torch.randn((N, 4, 64, 64), generator=gen, device=device, dtype=torch.float32)
                 # print(pure_noise)
 
@@ -308,7 +306,7 @@ def main(args):
 
 
                             # set threshold
-                            models['testr'].test_score_threshold = 0.7
+                            models['testr'].test_score_threshold = 0.5
 
                             # sampling train -  vis poly and text
                             for i in range(N):
@@ -390,6 +388,9 @@ def main(args):
                 tot_val_ssim=[]
                 tot_val_lpips=[]
 
+                # set seed for identical generation for validation sampling noise
+                gen.manual_seed(25)
+
                 # Validation
                 for val_batch in val_loader:
 
@@ -400,10 +401,6 @@ def main(args):
                     val_gt = rearrange(val_gt, "b h w c -> b c h w").contiguous().float()   # b 3 512 512
                     val_lq = rearrange(val_lq, "b h w c -> b c h w").contiguous().float()
                     val_bs, _, val_H, val_W = val_gt.shape
-
-
-                    # val_prompt is null prompts !!
-
 
                     # put models on evaluation for sampling
                     for model in models.values():
@@ -470,6 +467,7 @@ def main(args):
                                         wandb.log({f"sampling_val_LOSS_iter{sampled_iter}_timestep{sampled_timestep}/{ocr_key}": ocr_val.item()})
                                     wandb.log({f"sampling_val_LOSS_iter{sampled_iter}_timestep{sampled_timestep}/ocr_tot_loss": sampling_val_ocr_tot_loss.item()})
 
+                                # breakpoint()
 
                                 # vis poly and text
                                 for i in range(M):
