@@ -105,7 +105,7 @@ dataset:
     target: diffbir.dataset.pho_codeformer.CodeformerDataset
     params:
       # training file list path
-      file_list: /media/dataset1/jinlovespho/NIPS2025/data/text_restoration/17K
+      file_list: /media/dataset1/text_restoration/100K
       file_backend_cfg:
         target: diffbir.dataset.file_backend.HardDiskBackend
       out_size: 512
@@ -121,7 +121,7 @@ dataset:
       data_args: {
         'mode': 'TRAIN',
         'datasets':['sam_clean'], 
-        'ann_path':'/media/dataset1/jinlovespho/NIPS2025/data/text_restoration/17K/combined_restoration_dataset.json',
+        'ann_path':'/media/dataset1/text_restoration/100K/combined_restoration_dataset.json',
         # xywh_unscaled, xyxy_scaled, cxcywh_scaled
         'bbox_format': 'cxcywh_scaled', 
         'model_img_size': [512, 512],
@@ -133,7 +133,7 @@ dataset:
     target: diffbir.dataset.pho_codeformer.CodeformerDataset
     params:
       # training file list path
-      file_list: /media/dataset1/jinlovespho/NIPS2025/data/text_restoration/17K
+      file_list: /media/dataset1/text_restoration/100K
       file_backend_cfg:
         target: diffbir.dataset.file_backend.HardDiskBackend
       out_size: 512
@@ -149,7 +149,7 @@ dataset:
       data_args: {
         'mode': 'VAL',
         'datasets':['sam_clean'],
-        'ann_path':'/media/dataset1/jinlovespho/NIPS2025/data/text_restoration/17K/combined_restoration_dataset.json',
+        'ann_path':'/media/dataset1/text_restoration/100K/combined_restoration_dataset.json',
         # xywh_unscaled, xyxy_scaled, cxcywh_scaled
         'bbox_format': 'cxcywh_scaled',
         'model_img_size': [512, 512],
@@ -180,8 +180,7 @@ train:
   log_num_train_img: 3
   learning_rate: 1e-4
   # experiment save directory path
-  exp_dir: ./model_ckpts
-
+  exp_dir: ./model_ckpts/sam_cleaned_100k/stage2
 
 
 val:
@@ -201,22 +200,21 @@ log_args:
 
 exp_args:
   # NULLprompt_testrScratch
-  log_additional_msg: GTprompt_STAGE2_testrPretrained
+  log_additional_msg: GTprompt_STAGE2_testrPretrained_TEST
   log_user: pho
   log_server: server5
-  log_gpu: gpu2
+  log_gpu: gpu1
   # choose from [TRAIN, INFERENCE]
   mode: TRAIN
   # choose from [diffbir, diffbir_testr]
   model_name: diffbir_testr
-  # ./weights/totaltext_testr_R_50_polygon.pth
   testr_ckpt_dir: ./weights/totaltext_testr_R_50_polygon.pth
   # finetuning_method: testr, ctrlnet, ctrlnet_and_testr, ctrlnet_and_unetAttn, ctrlnet_and_unetAttn_and_testr
   finetuning_method: testr
   unet_feat_sampling_timestep: [10,20,30,40,50]
-  # ./model_ckpts/pho_server5_gpu1_TRAIN_DATA_sam_MODEL_diffbir_baseline_FT_ctrlnet_bs3_lr0.0001_nullprompt/0060000.pt
-  resume_ckpt_dir: ./model_ckpts/pho_server5_gpu1_TRAIN_DATA_sam_clean_MODEL_diffbir_FT_ctrlnet_and_unetAttn_bs3_lr0.0001_GTprompt/0100000.pt
+  resume_ckpt_dir:
   ocr_loss_weight: 1.0
+
   
   
   

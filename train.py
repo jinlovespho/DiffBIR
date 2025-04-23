@@ -392,7 +392,7 @@ def main(args):
                 gen.manual_seed(25)
 
                 # Validation
-                for val_batch in val_loader:
+                for val_batch_idx, val_batch in enumerate(val_loader):
 
                     # load val data
                     to(val_batch, device)
@@ -467,12 +467,11 @@ def main(args):
                                         wandb.log({f"sampling_val_LOSS_iter{sampled_iter}_timestep{sampled_timestep}/{ocr_key}": ocr_val.item()})
                                     wandb.log({f"sampling_val_LOSS_iter{sampled_iter}_timestep{sampled_timestep}/ocr_tot_loss": sampling_val_ocr_tot_loss.item()})
 
-                                # breakpoint()
 
                                 # vis poly and text
                                 for i in range(M):
-                                    vis_val_gt = val_gt[i]                                # 3 512 512 [-1,1]
-                                    vis_val_gt = (vis_val_gt + 1)/2 * 255.0         # 3 512 512 [0,255]
+                                    vis_val_gt = val_gt[i]                                  # 3 512 512 [-1,1]
+                                    vis_val_gt = (vis_val_gt + 1)/2 * 255.0                 # 3 512 512 [0,255]
                                     vis_val_gt = vis_val_gt.permute(1,2,0).detach().cpu().numpy().astype(np.uint8).copy()  # 512 512 3
 
                                     results_per_img = sampling_val_ocr_results[i]
@@ -539,20 +538,19 @@ def main(args):
                                     })
                             
                             # log sampling val images 
-                            wandb.log({ f'sampling_val_FINAL_VIS/val_gt': wandb.Image((val_log_gt + 1) / 2, caption=f'gt_img'),
-                                        f'sampling_val_FINAL_VIS/val_lq': wandb.Image(val_log_lq, caption=f'lq_img'),
-                                        f'sampling_val_FINAL_VIS/val_cleaned': wandb.Image(val_log_clean, caption=f'cleaned_img'),
-                                        f'sampling_val_FINAL_VIS/val_sampled': wandb.Image(torch.clip((pure_cldm.vae_decode(val_z) + 1) / 2, 0, 1), caption=f'sampled_img'),
-                                        f'sampling_val_FINAL_VIS/val_prompt': wandb.Image(log_txt_as_img((256, 256), val_log_prompt), caption=f'prompt'),
+                            wandb.log({ f'sampling_val_FINAL_VIS/{val_batch_idx}_val_gt': wandb.Image((val_log_gt + 1) / 2, caption=f'gt_img'),
+                                        f'sampling_val_FINAL_VIS/{val_batch_idx}_val_lq': wandb.Image(val_log_lq, caption=f'lq_img'),
+                                        f'sampling_val_FINAL_VIS/{val_batch_idx}_val_cleaned': wandb.Image(val_log_clean, caption=f'cleaned_img'),
+                                        f'sampling_val_FINAL_VIS/{val_batch_idx}_val_sampled': wandb.Image(torch.clip((pure_cldm.vae_decode(val_z) + 1) / 2, 0, 1), caption=f'sampled_img'),
+                                        f'sampling_val_FINAL_VIS/{val_batch_idx}_val_prompt': wandb.Image(log_txt_as_img((256, 256), val_log_prompt), caption=f'prompt'),
                                     })
-                            wandb.log({f'sampling_val_FINAL_VIS/val_all': wandb.Image(torch.concat([val_log_lq, val_log_clean, torch.clip((pure_cldm.vae_decode(val_z) + 1) / 2, 0, 1), val_log_gt], dim=2), caption='lq_clean_sample,gt')})
+                            wandb.log({f'sampling_val_FINAL_VIS/{val_batch_idx}_val_all': wandb.Image(torch.concat([val_log_lq, val_log_clean, torch.clip((pure_cldm.vae_decode(val_z) + 1) / 2, 0, 1), val_log_gt], dim=2), caption='lq_clean_sample,gt')})
 
                     # put models back to training 
                     for model in models.values():
                         if isinstance(model, nn.Module):
                             model.train()
-
-
+                    
                 # average using numpy
                 tot_val_psnr = np.array(tot_val_psnr).mean()
                 tot_val_ssim = np.array(tot_val_ssim).mean()

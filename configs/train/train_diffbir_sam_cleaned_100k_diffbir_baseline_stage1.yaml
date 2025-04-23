@@ -125,7 +125,7 @@ dataset:
         # xywh_unscaled, xyxy_scaled, cxcywh_scaled
         'bbox_format': 'cxcywh_scaled', 
         'model_img_size': [512, 512],
-        'use_gtprompt': True,
+        'use_gtprompt': False,
         }
   
   # validation data config
@@ -153,7 +153,7 @@ dataset:
         # xywh_unscaled, xyxy_scaled, cxcywh_scaled
         'bbox_format': 'cxcywh_scaled',
         'model_img_size': [512, 512],
-        'use_gtprompt': True,
+        'use_gtprompt': False,
         }
 
     
@@ -173,7 +173,7 @@ train:
   noise_aug_timestep: 0
   num_workers: 4
   train_steps: 100000
-  ckpt_every: 20000
+  ckpt_every: 25000
   log_loss_every: 50
   log_image_every: 500
   batch_size: 3
@@ -200,17 +200,17 @@ log_args:
 
 exp_args:
   # NULLprompt_testrScratch
-  log_additional_msg: GTprompt_STAGE1_TEST
+  log_additional_msg: NULLprompt_STAGE1
   log_user: pho
   log_server: server5
-  log_gpu: gpu1
+  log_gpu: gpu0
   # choose from [TRAIN, INFERENCE]
   mode: TRAIN
   # choose from [diffbir, diffbir_testr]
-  model_name: diffbir_testr
+  model_name: diffbir
   testr_ckpt_dir:
   # finetuning_method: testr, ctrlnet, ctrlnet_and_testr, ctrlnet_and_unetAttn, ctrlnet_and_unetAttn_and_testr
-  finetuning_method: ctrlnet_and_unetAttn
+  finetuning_method: ctrlnet
   unet_feat_sampling_timestep: [10,20,30,40,50]
   resume_ckpt_dir:
   ocr_loss_weight: 0.0
