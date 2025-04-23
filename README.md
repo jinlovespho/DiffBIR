@@ -23,10 +23,10 @@ pip install -r requirements.txt
 # install detectron2 if detectron2 is not in the folder
 # python -m pip3 install 'git+https://github.com/facebookresearch/detectron2.git'
 cd detectron2 
-pip3 install -e .
+pip install -e .
 # install testr
 cd testr 
-pip3 install -e .
+pip install -e .
 ```
 
 
