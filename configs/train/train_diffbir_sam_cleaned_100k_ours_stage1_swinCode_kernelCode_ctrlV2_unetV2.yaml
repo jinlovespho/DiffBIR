@@ -99,6 +99,7 @@ model:
 
 
 dataset:
+  dataset_type: codeformer
 
   # training data config
   train:
@@ -113,8 +114,11 @@ dataset:
       blur_kernel_size: 41
       kernel_list: ['iso', 'aniso']
       kernel_prob: [0.5, 0.5]
-      blur_sigma: [0.1, 0.5]
-      downsample_range: [4, 4]
+      blur_sigma: [0.1, 12]
+      downsample_range: [1, 12]
+      # # OUR_KERNEL
+      # blur_sigma: [0.1, 0.5]
+      # downsample_range: [4, 4]
       noise_range: [0, 15]
       jpeg_range: [30, 100]
       # additional args
@@ -141,8 +145,11 @@ dataset:
       blur_kernel_size: 41
       kernel_list: ['iso', 'aniso']
       kernel_prob: [0.5, 0.5]
-      blur_sigma: [0.1, 0.5]
-      downsample_range: [4, 4]
+      blur_sigma: [0.1, 12]
+      downsample_range: [1, 12]
+      # # OUR_KERNEL
+      # blur_sigma: [0.1, 0.5]
+      # downsample_range: [4, 4]
       noise_range: [0, 15]
       jpeg_range: [30, 100]
       # additional args
@@ -157,19 +164,26 @@ dataset:
         }
 
     
-
-batch_transform:
+train_batch_transform:
   target: diffbir.dataset.batch_transform.IdentityBatchTransform
 
+val_batch_transform:
+  target: diffbir.dataset.batch_transform.IdentityBatchTransform
 
 
 # training args
 train:
   # pretrained sd v2.1 path
-  sd_path: ./weights/v2-1_512-ema-pruned.ckpt
+  # sd_path: ./weights/v2-1_512-ema-pruned.ckpt           -> unetV2
+  # sd_path: ./weights/sd2.1-base-zsnr-laionaes5.ckpt     -> unetV21
+  sd_path: ./weights/v2-1_512-ema-pruned.ckpt       
   # stage 1 swinir path.
-  swinir_path: ./weights/codeformer_swinir.ckpt
-  resume: ./weights/DiffBIR_v2.1.pt
+  # swinir_path: ./weights/codeformer_swinir.ckpt         -> swinCode
+  # swinir_path: ./weights/realesrgan_s4_swinir_100k.pth  -> swinReal
+  swinir_path: ./weights/codeformer_swinir.ckpt   
+  # resume: ./weights/v2.pth                              -> ctrlV2
+  # resume: ./weights/DiffBIR_v2.1.pt                     -> ctrlV21
+  resume: ./weights/v2.pth 
   noise_aug_timestep: 0
   num_workers: 4
   train_steps: 100000
@@ -200,10 +214,10 @@ log_args:
 
 exp_args:
   # NULLprompt_testrScratch
-  log_additional_msg: GTprompt_STAGE1_TEST
+  log_additional_msg: SAM100k_STAGE1_GTprompt_swinCode_kernelCode_ctrlV2_unetV2
   log_user: pho
   log_server: server4
-  log_gpu: gpu0
+  log_gpu: gpu2
   # choose from [TRAIN, INFERENCE]
   mode: TRAIN
   # choose from [diffbir, diffbir_testr]

@@ -5,7 +5,8 @@ import argparse
 from omegaconf import OmegaConf
 from diffbir.model import ControlLDM, SwinIR, Diffusion
 from diffbir.utils.common import instantiate_from_config, to, log_txt_as_img
-from diffbir.dataset.pho_codeformer import collate_fn 
+from diffbir.dataset.pho_codeformer import collate_fn_code
+from diffbir.dataset.pho_realesrgan import collate_fn_real
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 import torch 
@@ -48,6 +49,13 @@ def load_data(accelerator, cfg):
     # set dataset 
     train_ds = instantiate_from_config(cfg.dataset.train)
     val_ds = instantiate_from_config(cfg.dataset.val)
+    
+    
+    if cfg.dataset.dataset_type == 'realsr':
+        collate_fn = collate_fn_real
+    elif cfg.dataset.dataset_type == 'codeformer':
+        collate_fn = collate_fn_code 
+
 
     # set data loader 
     train_loader = DataLoader(

@@ -42,8 +42,9 @@ def main(args):
 
     # load data
     train_ds, val_ds, train_loader, val_loader = initialize.load_data(accelerator, cfg)
-    batch_transform = instantiate_from_config(cfg.batch_transform)
-
+    train_batch_transform = instantiate_from_config(cfg.train_batch_transform)
+    val_batch_transform = instantiate_from_config(cfg.val_batch_transform)
+    
 
     # load models
     models, resume_ckpt_path = initialize.load_model(accelerator, device, args, cfg)
@@ -126,12 +127,12 @@ def main(args):
 
             # load training data
             to(batch, device)
-            batch = batch_transform(batch)
+            batch = train_batch_transform(batch)
             gt, lq, train_prompt, texts, boxes, polys, text_encs, img_name = batch
-            gt = rearrange(gt, "b h w c -> b c h w").contiguous().float()   # b 3 512 512
-            lq = rearrange(lq, "b h w c -> b c h w").contiguous().float()   # b 3 512 512
+            gt = rearrange(gt, "b h w c -> b c h w").contiguous().float()   # b 3 512 512 [-1,1]
+            lq = rearrange(lq, "b h w c -> b c h w").contiguous().float()   # b 3 512 512 [0,1]
             train_bs = gt.shape[0]
-
+            
             # prepare VAE, condition, timestep
             with torch.no_grad():
                 z_0 = pure_cldm.vae_encode(gt)                              # b 4 64 64
@@ -396,12 +397,12 @@ def main(args):
 
                     # load val data
                     to(val_batch, device)
-                    val_batch = batch_transform(val_batch)
+                    val_batch = val_batch_transform(val_batch)
                     val_gt, val_lq, val_prompt, val_texts, val_boxes, val_polys, val_text_encs, val_img_name = val_batch 
                     val_gt = rearrange(val_gt, "b h w c -> b c h w").contiguous().float()   # b 3 512 512
                     val_lq = rearrange(val_lq, "b h w c -> b c h w").contiguous().float()
                     val_bs, _, val_H, val_W = val_gt.shape
-
+                    
                     # put models on evaluation for sampling
                     for model in models.values():
                         if isinstance(model, nn.Module):

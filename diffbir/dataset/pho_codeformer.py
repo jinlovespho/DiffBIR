@@ -98,9 +98,7 @@ class CodeformerDataset(data.Dataset):
             img_name = image_file['img_name']
             poly = image_file.get('poly')
 
-
             img_gt = self.load_gt_image(gt_path)
-
             if img_gt is None:
                 print(f"filed to load {gt_path}, try another image")
                 index = random.randint(0, len(self) - 1)
@@ -151,7 +149,7 @@ class CodeformerDataset(data.Dataset):
 
 
 # PHO - LOL.. this solves it! :)
-def collate_fn(batch):
+def collate_fn_code(batch):
 
     gt, lq, prompt, text, bbox, poly, text_enc, img_name = zip(*batch)
 
