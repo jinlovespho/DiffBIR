@@ -9,7 +9,7 @@
 
 ```shell
 # clone repo
-git clone https://github.com/jinlovespho/DiffBIR.git
+git clone https://github.com/jinlovespho/DiffBIR.git -b jihye
 cd DiffBIR 
 
 # create environment

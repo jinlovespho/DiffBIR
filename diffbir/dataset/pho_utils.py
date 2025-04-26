@@ -420,8 +420,8 @@ def load_file_list(file_list_path: str, data_args=None):
                               "img_name": img_id})     
     
 
-    if mode=='VAL':
-        files = random.sample(files, 120)
+    # if mode=='VAL':
+    #     files = random.sample(files, 120)
 
     return files
 
