@@ -291,8 +291,8 @@ train:
   ckpt_every: 25000
   log_loss_every: 50
   log_image_every: 500
-  batch_size: 3
-  log_num_train_img: 3
+  batch_size: 64
+  log_num_train_img: 64
   learning_rate: 1e-4
   # experiment save directory path
   exp_dir: ./model_ckpts/sam_cleaned_100k/stage1
@@ -300,8 +300,8 @@ train:
 
 val:
   num_workers: 4
-  batch_size: 3
-  log_num_val_img: 3
+  batch_size: 64
+  log_num_val_img: 64
   log_image_every: 500
 
 
