@@ -30,9 +30,26 @@ pip install -e .
 ```
 
 
+### Download pretrained weights 
+```shell
+bash download_weights.sh
+```
+
 
 ### Run training script 
 ```shell
 cd DiffBIR
-bash run_script/train_script/run_train_diffbir_sam_try1.sh
+
+# run diffbir baseline
+bash run_script/train_script/run_train_diffbir_sam_cleaned_100k_diffbirBaseline_stage1_swinCode_kernelCode_ctrlV2_unetV2.sh
+
+# run diffbir ours1
+bash run_script/train_script/run_train_diffbir_sam_cleaned_100k_ours_stage1_swinCode_kernelCode_ctrlV2_unetV2.sh
+
+# run diffbir ours2
+bash run_script/train_script/run_train_diffbir_sam_cleaned_100k_ours_stage1_swinReal_kernelReal_ctrlV2_unetV2.sh
+
+# run diffbir ours3
+bash run_script/train_script/run_train_diffbir_sam_cleaned_100k_ours_stage1_swinReal_kernelReal_ctrlV21_unetV21.sh
+
 ```

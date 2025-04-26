@@ -199,8 +199,8 @@ train:
 
 val:
   num_workers: 4
-  batch_size: 6
-  log_num_val_img: 6
+  batch_size: 3
+  log_num_val_img: 3
   log_image_every: 500
 
 

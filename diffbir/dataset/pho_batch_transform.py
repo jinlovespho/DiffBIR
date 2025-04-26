@@ -274,7 +274,7 @@ class RealESRGANBatchTransform(BatchTransform):
         self.gt = hq
         self.lq = lq
         self.txt = batch["prompt"]
-        self._dequeue_and_enqueue()
+        # self._dequeue_and_enqueue()
 
         # [0, 1], float32, rgb, nhwc
         lq = self.lq.float().permute(0, 2, 3, 1).contiguous()
