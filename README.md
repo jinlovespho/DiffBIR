@@ -36,20 +36,32 @@ bash download_weights.sh
 ```
 
 
+### Experiment config file location
+```shell
+configs/train/train_diffbir_sam_cleaned_100k_diffbirBaseline_stage1_swinCode_kernelCode_ctrlV2_unetV2.yaml
+
+
+```
+
+
 ### Run training script 
 ```shell
 cd DiffBIR
 
 # run diffbir baseline
+# config location: configs/train/train_diffbir_sam_cleaned_100k_diffbirBaseline_stage1_swinCode_kernelCode_ctrlV2_unetV2.yaml
 bash run_script/train_script/run_train_diffbir_sam_cleaned_100k_diffbirBaseline_stage1_swinCode_kernelCode_ctrlV2_unetV2.sh
 
 # run diffbir ours1
+# config location: configs/train/train_diffbir_sam_cleaned_100k_ours_stage1_swinCode_kernelCode_ctrlV2_unetV2.yaml
 bash run_script/train_script/run_train_diffbir_sam_cleaned_100k_ours_stage1_swinCode_kernelCode_ctrlV2_unetV2.sh
 
 # run diffbir ours2
+# config location: configs/train/train_diffbir_sam_cleaned_100k_ours_stage1_swinReal_kernelReal_ctrlV2_unetV2.yaml
 bash run_script/train_script/run_train_diffbir_sam_cleaned_100k_ours_stage1_swinReal_kernelReal_ctrlV2_unetV2.sh
 
 # run diffbir ours3
+# config location: configs/train/train_diffbir_sam_cleaned_100k_ours_stage1_swinReal_kernelReal_ctrlV21_unetV21.yaml
 bash run_script/train_script/run_train_diffbir_sam_cleaned_100k_ours_stage1_swinReal_kernelReal_ctrlV21_unetV21.sh
 
 ```
