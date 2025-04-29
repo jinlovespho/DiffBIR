@@ -290,8 +290,8 @@ def collate_fn_real(batch):
             "prompt": list(prompt),
             'text': list(text),
             'bbox': list(bbox),
-            'poly': list(poly),
-            'text_enc': list(text_enc),
+            'poly': list(poly_tensor),
+            'text_enc': list(text_enc_tensor),
             'img_name': list(img_name)
         }
 
