@@ -39,6 +39,7 @@ bash download_weights.sh
 ### Experiment config file location
 ```shell
 configs/train
+
 ```
 
 
