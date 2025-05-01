@@ -217,20 +217,19 @@ exp_args:
   log_additional_msg: SAM100k_STAGE1_NULLprompt_swinCode_kernelCode_ctrlV2_unetV2
   log_user: pho
   log_server: server4
-  log_gpu: gpu3
+  log_gpu: gpu0
   # choose from [TRAIN, INFERENCE]
   mode: TRAIN
   # choose from [diffbir, diffbir_testr]
   model_name: diffbir
   testr_ckpt_dir:
   # finetuning_method: testr, ctrlnet, ctrlnet_and_testr, ctrlnet_and_unetAttn, ctrlnet_and_unetAttn_and_testr
-  finetuning_method: ctrlnet
+  finetuning_method: ctrlnet_and_unetAttn
   unet_feat_sampling_timestep: [10,20,30,40,50]
   resume_ckpt_dir:
   ocr_loss_weight: 0.0
 
-  
-  
+
   
 
   
