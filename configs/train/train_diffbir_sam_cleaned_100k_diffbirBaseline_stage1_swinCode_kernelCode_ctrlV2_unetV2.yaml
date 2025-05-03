@@ -192,7 +192,7 @@ train:
   log_image_every: 500
   batch_size: 64
   log_num_train_img: 64
-  learning_rate: 1e-4
+  learning_rate: 1e-5
   # experiment save directory path
   exp_dir: ./model_ckpts/sam_cleaned_100k/stage1
 
@@ -216,8 +216,8 @@ exp_args:
   # NULLprompt_testrScratch
   log_additional_msg: SAM100k_STAGE1_NULLprompt_swinCode_kernelCode_ctrlV2_unetV2
   log_user: pho
-  log_server: server4
-  log_gpu: gpu3
+  log_server: serverSAMSUNG
+  log_gpu: gpu0123
   # choose from [TRAIN, INFERENCE]
   mode: TRAIN
   # choose from [diffbir, diffbir_testr]

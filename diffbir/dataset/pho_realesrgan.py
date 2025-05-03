@@ -161,8 +161,8 @@ class RealESRGANDataset(data.Dataset):
 
         # hwc, rgb to bgr, [0, 255] to [0, 1], float32
         img_hq = (img_gt[..., ::-1] / 255.0).astype(np.float32)
-        # if np.random.uniform() < self.p_empty_prompt:
-        #     prompt = ""
+        if np.random.uniform() < self.p_empty_prompt:
+            prompt = ""
 
         # -------------------- Do augmentation for training: flip, rotation -------------------- #
         img_hq = augment(img_hq, self.use_hflip, self.use_rot)
@@ -290,8 +290,8 @@ def collate_fn_real(batch):
             "prompt": list(prompt),
             'text': list(text),
             'bbox': list(bbox),
-            'poly': list(poly),
-            'text_enc': list(text_enc),
+            'poly': list(poly_tensor),
+            'text_enc': list(text_enc_tensor),
             'img_name': list(img_name)
         }
 

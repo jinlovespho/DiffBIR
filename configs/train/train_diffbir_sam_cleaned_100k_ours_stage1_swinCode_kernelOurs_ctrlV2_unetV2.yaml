@@ -106,7 +106,7 @@ dataset:
     target: diffbir.dataset.pho_codeformer.CodeformerDataset
     params:
       # training file list path
-      file_list: /media/dataset2/text_restoration/100K
+      file_list: /media/dataset1/text_restoration/100K
       file_backend_cfg:
         target: diffbir.dataset.file_backend.HardDiskBackend
       out_size: 512
@@ -114,18 +114,18 @@ dataset:
       blur_kernel_size: 41
       kernel_list: ['iso', 'aniso']
       kernel_prob: [0.5, 0.5]
-      blur_sigma: [0.1, 12]
-      downsample_range: [1, 12]
-      # # OUR_KERNEL
-      # blur_sigma: [0.1, 0.5]
-      # downsample_range: [4, 4]
+      # blur_sigma: [0.1, 12]
+      # downsample_range: [1, 12]
+      # OUR_KERNEL
+      blur_sigma: [0.1, 0.5]
+      downsample_range: [4, 4]
       noise_range: [0, 15]
       jpeg_range: [30, 100]
       # additional args
       data_args: {
         'mode': 'TRAIN',
         'datasets':['sam_clean'], 
-        'ann_path':'/media/dataset2/text_restoration/100K/combined_restoration_dataset.json',
+        'ann_path':'/media/dataset1/text_restoration/100K/combined_restoration_dataset.json',
         # xywh_unscaled, xyxy_scaled, cxcywh_scaled
         'bbox_format': 'cxcywh_scaled', 
         'model_img_size': [512, 512],
@@ -137,7 +137,7 @@ dataset:
     target: diffbir.dataset.pho_codeformer.CodeformerDataset
     params:
       # training file list path
-      file_list: /media/dataset2/text_restoration/100K
+      file_list: /media/dataset1/text_restoration/100K
       file_backend_cfg:
         target: diffbir.dataset.file_backend.HardDiskBackend
       out_size: 512
@@ -145,18 +145,18 @@ dataset:
       blur_kernel_size: 41
       kernel_list: ['iso', 'aniso']
       kernel_prob: [0.5, 0.5]
-      blur_sigma: [0.1, 12]
-      downsample_range: [1, 12]
-      # # OUR_KERNEL
-      # blur_sigma: [0.1, 0.5]
-      # downsample_range: [4, 4]
+      # blur_sigma: [0.1, 12]
+      # downsample_range: [1, 12]
+      # OUR_KERNEL
+      blur_sigma: [0.1, 0.5]
+      downsample_range: [4, 4]
       noise_range: [0, 15]
       jpeg_range: [30, 100]
       # additional args
       data_args: {
         'mode': 'VAL',
         'datasets':['sam_clean'],
-        'ann_path':'/media/dataset2/text_restoration/100K/combined_restoration_dataset.json',
+        'ann_path':'/media/dataset1/text_restoration/100K/combined_restoration_dataset.json',
         # xywh_unscaled, xyxy_scaled, cxcywh_scaled
         'bbox_format': 'cxcywh_scaled',
         'model_img_size': [512, 512],
@@ -190,17 +190,17 @@ train:
   ckpt_every: 25000
   log_loss_every: 50
   log_image_every: 500
-  batch_size: 64
-  log_num_train_img: 64
-  learning_rate: 1e-5
+  batch_size: 3
+  log_num_train_img: 3
+  learning_rate: 1e-4
   # experiment save directory path
   exp_dir: ./model_ckpts/sam_cleaned_100k/stage1
 
 
 val:
   num_workers: 4
-  batch_size: 64
-  log_num_val_img: 64
+  batch_size: 2
+  log_num_val_img: 2
   log_image_every: 500
 
 
@@ -214,7 +214,7 @@ log_args:
 
 exp_args:
   # NULLprompt_testrScratch
-  log_additional_msg: SAM100k_STAGE1_GTprompt_swinCode_kernelCode_ctrlV2_unetV2
+  log_additional_msg: SAM100k_STAGE1_GTprompt_swinCode_kernelOurs_ctrlV2_unetV2
   log_user: pho
   log_server: serverSAMSUNG
   log_gpu: gpu0123

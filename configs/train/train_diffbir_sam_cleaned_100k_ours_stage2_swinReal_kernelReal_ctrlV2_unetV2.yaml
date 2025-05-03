@@ -84,24 +84,24 @@ model:
       unshuffle: True
       unshuffle_scale: 8
 
+  # diffusion:
+  #   target: diffbir.model.gaussian_diffusion.Diffusion
+  #   params:
+  #     linear_start: 0.00085
+  #     linear_end: 0.0120
+  #     timesteps: 1000
+  #     zero_snr: True
+  #     parameterization: v
+
+  # diffusion pipeline config
   diffusion:
     target: diffbir.model.gaussian_diffusion.Diffusion
     params:
       linear_start: 0.00085
       linear_end: 0.0120
       timesteps: 1000
-      zero_snr: True
-      parameterization: v
-
-#   # diffusion pipeline config
-#   diffusion:
-#     target: diffbir.model.gaussian_diffusion.Diffusion
-#     params:
-#       linear_start: 0.00085
-#       linear_end: 0.0120
-#       timesteps: 1000
-#       zero_snr: False
-#       parameterization: eps
+      zero_snr: False
+      parameterization: eps
 
 
 dataset:
@@ -110,7 +110,7 @@ dataset:
   train:
     target: diffbir.dataset.pho_realesrgan.RealESRGANDataset
     params:
-      file_list: /media/dataset2/text_restoration/100K
+      file_list: /media/dataset1/text_restoration/100K
       # # Path to the file list.
       # file_metas:
       #   # The training set is formatted as a parquet file.
@@ -153,7 +153,7 @@ dataset:
       data_args: {
         'mode': 'TRAIN',
         'datasets':['sam_clean'], 
-        'ann_path':'/media/dataset2/text_restoration/100K/combined_restoration_dataset.json',
+        'ann_path':'/media/dataset1/text_restoration/100K/combined_restoration_dataset.json',
         # xywh_unscaled, xyxy_scaled, cxcywh_scaled
         'bbox_format': 'cxcywh_scaled', 
         'model_img_size': [512, 512],
@@ -164,7 +164,7 @@ dataset:
   val:
     target: diffbir.dataset.pho_realesrgan.RealESRGANDataset
     params:
-      file_list: /media/dataset2/text_restoration/100K
+      file_list: /media/dataset1/text_restoration/100K
       # # Path to the file list.
       # file_metas:
       #   # The training set is formatted as a parquet file.
@@ -207,7 +207,7 @@ dataset:
       data_args: {
         'mode': 'VAL',
         'datasets':['sam_clean'], 
-        'ann_path':'/media/dataset2/text_restoration/100K/combined_restoration_dataset.json',
+        'ann_path':'/media/dataset1/text_restoration/100K/combined_restoration_dataset.json',
         # xywh_unscaled, xyxy_scaled, cxcywh_scaled
         'bbox_format': 'cxcywh_scaled', 
         'model_img_size': [512, 512],
@@ -277,31 +277,31 @@ train:
   # pretrained sd v2.1 path
   # sd_path: ./weights/v2-1_512-ema-pruned.ckpt           -> unetV2
   # sd_path: ./weights/sd2.1-base-zsnr-laionaes5.ckpt     -> unetV21
-  sd_path: ./weights/sd2.1-base-zsnr-laionaes5.ckpt       
+  sd_path: ./weights/v2-1_512-ema-pruned.ckpt       
   # stage 1 swinir path.
   # swinir_path: ./weights/codeformer_swinir.ckpt         -> swinCode
   # swinir_path: ./weights/realesrgan_s4_swinir_100k.pth  -> swinReal
   swinir_path: ./weights/realesrgan_s4_swinir_100k.pth
   # resume: ./weights/v2.pth                              -> ctrlV2
   # resume: ./weights/DiffBIR_v2.1.pt                     -> ctrlV21
-  resume: ./weights/DiffBIR_v2.1.pt
+  resume: ./weights/v2.pth
   noise_aug_timestep: 0
   num_workers: 4
   train_steps: 100000
   ckpt_every: 25000
   log_loss_every: 50
   log_image_every: 500
-  batch_size: 64
-  log_num_train_img: 64
-  learning_rate: 1e-5
+  batch_size: 3
+  log_num_train_img: 3
+  learning_rate: 5e-5
   # experiment save directory path
-  exp_dir: ./model_ckpts/sam_cleaned_100k/stage1
+  exp_dir: ./model_ckpts/sam_cleaned_100k/stage2
 
 
 val:
   num_workers: 4
-  batch_size: 64
-  log_num_val_img: 64
+  batch_size: 3
+  log_num_val_img: 3
   log_image_every: 500
 
 
@@ -315,20 +315,21 @@ log_args:
 
 exp_args:
   # NULLprompt_testrScratch
-  log_additional_msg: SAM100k_STAGE1_GTprompt_swinReal_kernelReal_ctrlV21_unetV21
+  log_additional_msg: SAM100k_STAGE2_GTprompt_testrPretrained_swinReal_kernelReal_ctrlV2_unetV2
   log_user: pho
   log_server: serverSAMSUNG
   log_gpu: gpu0123
   # choose from [TRAIN, INFERENCE]
   mode: TRAIN
   # choose from [diffbir, diffbir_testr]
-  model_name: diffbir
-  testr_ckpt_dir:
+  model_name: diffbir_testr
+  testr_ckpt_dir: ./weights/totaltext_testr_R_50_polygon.pth
   # finetuning_method: testr, ctrlnet, ctrlnet_and_testr, ctrlnet_and_unetAttn, ctrlnet_and_unetAttn_and_testr
-  finetuning_method: ctrlnet_and_unetAttn
+  finetuning_method: testr
   unet_feat_sampling_timestep: [10,20,30,40,50]
-  resume_ckpt_dir:
-  ocr_loss_weight: 0.0
+  #  아래와 같은 예시로 학습했던 stage1 체크포인트 정해주세요
+  resume_ckpt_dir: ./model_ckpts/sam_cleaned_100k/stage1/pho_server4_gpu1_TRAIN_DATA_sam_clean_MODEL_diffbir_FT_ctrlnet_and_unetAttn_bs3_lr0.0001_SAM100k_STAGE1_GTprompt_swinReal_kernelReal_ctrlV2_unetV2/0100000.pt
+  ocr_loss_weight: 1.0
 
   
   
