@@ -221,7 +221,7 @@ train_batch_transform:
   params:
     use_sharpener: true
     # Queue size of training pool, this should be multiples of batch_size (per GPU).
-    queue_size: TRAININGBATCHSIZE * 16
+    queue_size: 512
     # the first degradation process
     resize_prob: [0.2, 0.7, 0.1] # up, down, keep
     resize_range: [0.15, 1.5]
@@ -249,7 +249,7 @@ val_batch_transform:
   params:
     use_sharpener: true
     # Queue size of training pool, this should be multiples of batch_size (per GPU).
-    queue_size: VALIDATIONBATCHSIZE * 16
+    queue_size: 512
     # the first degradation process
     resize_prob: [0.2, 0.7, 0.1] # up, down, keep
     resize_range: [0.15, 1.5]
@@ -291,8 +291,8 @@ train:
   ckpt_every: 25000
   log_loss_every: 50
   log_image_every: 500
-  batch_size: 3
-  log_num_train_img: 3
+  batch_size: 32
+  log_num_train_img: 32
   learning_rate: 5e-5
   # experiment save directory path
   exp_dir: ./model_ckpts/sam_cleaned_100k/stage2
@@ -300,8 +300,8 @@ train:
 
 val:
   num_workers: 4
-  batch_size: 3
-  log_num_val_img: 3
+  batch_size: 32
+  log_num_val_img: 32
   log_image_every: 500
 
 
