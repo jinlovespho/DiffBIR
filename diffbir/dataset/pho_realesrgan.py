@@ -161,8 +161,8 @@ class RealESRGANDataset(data.Dataset):
 
         # hwc, rgb to bgr, [0, 255] to [0, 1], float32
         img_hq = (img_gt[..., ::-1] / 255.0).astype(np.float32)
-        # if np.random.uniform() < self.p_empty_prompt:
-        #     prompt = ""
+        if np.random.uniform() < self.p_empty_prompt:
+            prompt = ""
 
         # -------------------- Do augmentation for training: flip, rotation -------------------- #
         img_hq = augment(img_hq, self.use_hflip, self.use_rot)
