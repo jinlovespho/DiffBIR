@@ -84,3 +84,20 @@ bash run_script/train_script/run_train_diffbir_sam_cleaned_100k_ours_stage2_swin
 # config location: configs/train/train_diffbir_sam_cleaned_100k_ours_stage2_swinReal_kernelReal_ctrlV21_unetV21.yaml
 bash run_script/train_script/run_train_diffbir_sam_cleaned_100k_ours_stage2_swinReal_kernelReal_ctrlV21_unetV21.sh
 ```
+
+
+### Stage3 training script 
+```shell
+
+# stage3 - run diffbir ours1 
+# config location: configs/train/train_diffbir_sam_cleaned_100k_ours_stage3_swinCode_kernelCode_ctrlV2_unetV2.yaml
+bash run_script/train_script/run_train_diffbir_sam_cleaned_100k_ours_stage3_swinCode_kernelCode_ctrlV2_unetV2.sh
+
+# stage3 - run diffbir ours2
+# config location: configs/train/train_diffbir_sam_cleaned_100k_ours_stage3_swinReal_kernelReal_ctrlV2_unetV2.yaml
+bash run_script/train_script/run_train_diffbir_sam_cleaned_100k_ours_stage3_swinReal_kernelReal_ctrlV2_unetV2.sh
+
+# stage3 - run diffbir ours3
+# config location: configs/train/train_diffbir_sam_cleaned_100k_ours_stage3_swinReal_kernelReal_ctrlV21_unetV21.yaml
+bash run_script/train_script/run_train_diffbir_sam_cleaned_100k_ours_stage3_swinReal_kernelReal_ctrlV21_unetV21.sh
+```
