@@ -316,7 +316,7 @@ def load_file_list(file_list_path: str, data_args=None):
 
 
             # image path 
-            imgs_path = f'{file_list_path}/images'
+            imgs_path = f'{file_list_path}/images/validation'
             imgs = sorted(os.listdir(imgs_path))
 
 
