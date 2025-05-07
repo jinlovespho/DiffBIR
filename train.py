@@ -391,7 +391,8 @@ def main(args):
                     val_batch = val_batch_transform(val_batch)
                     val_gt, val_lq, val_prompt, val_texts, val_boxes, val_polys, val_text_encs, val_img_name = val_batch 
                     val_gt = rearrange(val_gt, "b h w c -> b c h w").contiguous().float()   # b 3 512 512
-                    val_lq = rearrange(val_lq, "b h w c -> b c h w").contiguous().float()
+                    val_lq = rearrange(val_lq, "b h w c -> b c h w").contiguous().float()   # b 3 512 512 
+                    
                     val_bs, _, val_H, val_W = val_gt.shape
                     
                     # put models on evaluation for sampling
@@ -402,7 +403,7 @@ def main(args):
                     # prepare vae, condition
                     with torch.no_grad():
                         # val_z_0 = pure_cldm.vae_encode(val_gt)
-                        val_clean = models['swinir'](val_lq)
+                        val_clean = models['swinir'](val_lq)    # b 3 512 512
                         val_cond = pure_cldm.prepare_condition(val_clean, val_prompt)
 
                         # set number of val imgs to log
@@ -416,7 +417,7 @@ def main(args):
                         # print(pure_noise)
                         
                         # sampling
-                        val_z, val_sampled_unet_feats = sampler.sample(     # 6 4 56 56
+                        val_z, val_sampled_unet_feats = sampler.sample(     # b 4 56 56
                             model=models['cldm'],
                             device=device,
                             steps=50,
