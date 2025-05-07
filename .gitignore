@@ -53,3 +53,5 @@ model_ts*.txt
 .vscode
 _darcs
 
+
+val_result/

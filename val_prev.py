@@ -21,7 +21,6 @@ from torchvision.utils import save_image
 from torchvision.transforms.functional import to_pil_image
 from diffbir.dataset.pho_utils import encode, decode 
 from accelerate.utils import DistributedDataParallelKwargs
-import torchvision.transforms.functional as TF
 
 
 def main(args):
@@ -30,9 +29,8 @@ def main(args):
     # set accelerator, seed, device, config
     kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
     accelerator = Accelerator(split_batches=False, kwargs_handlers=[kwargs])
-    set_seed(25, device_specific=False)
+    set_seed(231, device_specific=True)
     device = accelerator.device
-    gen = torch.Generator(device)
     cfg = OmegaConf.load(args.config)
 
 
@@ -42,14 +40,21 @@ def main(args):
 
 
     # load data
-    # train_ds, val_ds, train_loader, val_loader = initialize.load_data(accelerator, cfg)
     _, val_ds, _, val_loader = initialize.load_data(accelerator, cfg)
-    # train_batch_transform = instantiate_from_config(cfg.train_batch_transform)
-    val_batch_transform = instantiate_from_config(cfg.val_batch_transform)
-    
+    batch_transform = instantiate_from_config(cfg.batch_transform)
+
 
     # load models
     models, resume_ckpt_path = initialize.load_model(accelerator, device, args, cfg)
+    
+
+    # # set training params
+    # train_params, train_model_names = initialize.set_training_params(accelerator, models, cfg)
+
+
+    # # setup optimizer
+    # opt = torch.optim.AdamW(train_params, lr=cfg.train.learning_rate)
+
 
     # setup ddpm
     diffusion: Diffusion = instantiate_from_config(cfg.model.diffusion)
@@ -59,7 +64,6 @@ def main(args):
 
     # setup accelerator    
     models = {k: accelerator.prepare(v) for k, v in models.items()}
-    # opt, train_loader, val_loader = accelerator.prepare(opt, train_loader, val_loader)
     val_loader = accelerator.prepare(val_loader)
 
 
@@ -71,60 +75,43 @@ def main(args):
     metric_psnr = pyiqa.create_metric('psnr', device=device)
     metric_ssim = pyiqa.create_metric('ssimc', device=device)
     metric_lpips = pyiqa.create_metric('lpips', device=device)
-    metric_dists = pyiqa.create_metric('dists', device=device)
-    # metric_fid = pyiqa.create_metric('fid', device=device)
-    metric_niqe = pyiqa.create_metric('niqe', device=device)
-    metric_musiq = pyiqa.create_metric('musiq', device=device)
-    metric_maniqa = pyiqa.create_metric('maniqa', device=device)
-    metric_clipiqa = pyiqa.create_metric('clipiqa', device=device)
 
 
-    # print Info
+    # print Training Info
     if accelerator.is_main_process:
-        print('='*100)
+        print('='*50)
         print(f'Experiment name: {exp_name}')
-        print('-'*50)
-        print(f"Save ckpt directory: {exp_dir}")
-        print(f"Training steps: {cfg.train.train_steps}")
-        print('-'*50)
+        # print(f"Training steps: {cfg.train.train_steps}")
+        print(f"Experiment directory: {exp_dir}")
         # print(f"Num train_dataset: {len(train_ds):,}")
         print(f"Num val_dataset: {len(val_ds):,}")
-        print('-'*50)
         print(f'Loaded models: {list(models.keys())}')
         print(f'Finetuning Method: {cfg.exp_args.finetuning_method}')
-        print('-'*50)
         print(f'Resume training ckpt: ', resume_ckpt_path)
         print(f'OCR pretrained ckpt: {cfg.exp_args.testr_ckpt_dir}')
-        print('-'*50)
-        print(f'OCR loss weight: ', cfg.exp_args.ocr_loss_weight)
-        print('='*100)
+        print('='*50)
+
 
 
     tot_val_psnr=[]
     tot_val_ssim=[]
     tot_val_lpips=[]
-    tot_val_dists=[]
-    tot_val_niqe=[]
-    tot_val_musiq=[]
-    tot_val_maniqa=[]
-    tot_val_clipiqa=[]
-    
-
-    # set seed for identical generation for validation sampling noise
-    gen.manual_seed(25)
 
     # Validation
-    for val_batch_idx, val_batch in enumerate(val_loader):
+    for val_batch in val_loader:
 
         # load val data
         to(val_batch, device)
-        val_batch = val_batch_transform(val_batch)
+        val_batch = batch_transform(val_batch)
         val_gt, val_lq, val_prompt, val_texts, val_boxes, val_polys, val_text_encs, val_img_name = val_batch 
         val_gt = rearrange(val_gt, "b h w c -> b c h w").contiguous().float()   # b 3 512 512
-        val_lq = rearrange(val_lq, "b h w c -> b c h w").contiguous().float()   # b 3 512 512 
-        
+        val_lq = rearrange(val_lq, "b h w c -> b c h w").contiguous().float()
         val_bs, _, val_H, val_W = val_gt.shape
-        
+
+
+        # val_prompt is null prompts !!
+
+
         # put models on evaluation for sampling
         for model in models.values():
             if isinstance(model, nn.Module):
@@ -133,7 +120,7 @@ def main(args):
         # prepare vae, condition
         with torch.no_grad():
             # val_z_0 = pure_cldm.vae_encode(val_gt)
-            val_clean = models['swinir'](val_lq)    # b 3 512 512
+            val_clean = models['swinir'](val_lq)
             val_cond = pure_cldm.prepare_condition(val_clean, val_prompt)
 
             # set number of val imgs to log
@@ -142,12 +129,9 @@ def main(args):
             val_log_cond = {k: v[:M] for k, v in val_cond.items()}
             val_log_gt, val_log_lq = val_gt[:M], val_lq[:M]
             val_log_prompt = val_prompt[:M]
-
-            pure_noise = torch.randn((M, 4, 64, 64), generator=gen, device=device, dtype=torch.float32)
-            # print(pure_noise)
             
             # sampling
-            val_z, val_sampled_unet_feats = sampler.sample(     # b 4 56 56
+            val_z, val_sampled_unet_feats = sampler.sample(     # 6 4 56 56
                 model=models['cldm'],
                 device=device,
                 steps=50,
@@ -155,7 +139,6 @@ def main(args):
                 cond=val_log_cond,
                 uncond=None,
                 cfg_scale=1.0,
-                x_T = pure_noise,
                 progress=accelerator.is_main_process,
                 cfg=cfg
             )
@@ -193,8 +176,8 @@ def main(args):
 
                     # vis poly and text
                     for i in range(M):
-                        vis_val_gt = val_gt[i]                                  # 3 512 512 [-1,1]
-                        vis_val_gt = (vis_val_gt + 1)/2 * 255.0                 # 3 512 512 [0,255]
+                        vis_val_gt = val_gt[i]                                # 3 512 512 [-1,1]
+                        vis_val_gt = (vis_val_gt + 1)/2 * 255.0         # 3 512 512 [0,255]
                         vis_val_gt = vis_val_gt.permute(1,2,0).detach().cpu().numpy().astype(np.uint8).copy()  # 512 512 3
 
                         results_per_img = sampling_val_ocr_results[i]
@@ -209,28 +192,41 @@ def main(args):
                             cv2.putText(vis_val_gt, val_pred_text, (val_ctrl_pnt[0][0], val_ctrl_pnt[0][1]-5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
                         # cv2.imwrite(f'./tmp{i}.jpg', vis_val_gt[...,::-1])
                         if accelerator.is_main_process and cfg.log_args.log_tool == 'wandb':
-                            wandb.log({f'sampling_val_VIS_iter{sampled_iter}_timestep{sampled_timestep}/{val_batch_idx}_poly{i}': wandb.Image(vis_val_gt, caption=f'draw sampled val ocr results on gt')})
-                            
+                            wandb.log({f'sampling_val_VIS_iter{sampled_iter}_timestep{sampled_timestep}/poly{i}': wandb.Image(vis_val_gt, caption=f'draw sampled val ocr results on gt')})
 
 
-            img_save_path=f'{exp_dir}/{exp_name}/sampled_val_imgs'
-            os.makedirs(img_save_path, exist_ok=True)
-            restored_img = torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, min=0, max=1).squeeze()   # b 3 512 512
-            restored_img_pil = TF.to_pil_image(restored_img.cpu())
-            restored_img_pil.save(f'{img_save_path}/{val_img_name[0]}.png')
-            
+
+                        # vis_val_box=[]
+                        # for i in range(M):
+                        #     vis_val_gt = val_gt[i]              # 3 512 512
+                        #     vis_val_gt = (vis_val_gt + 1) / 2 * 255.0
+
+                        #     # only label bbox for gt img
+                        #     vis_val_gt = vis_val_gt.permute(1,2,0).detach().cpu().numpy().astype(np.uint8).copy()  # 512 512 3
+
+                        #     for cx, cy, w, h in val_enc_box_points[i]:
+                        #         # Convert cx, cy, w, h (normalized) to x1, y1, x2, y2 (absolute coordinates)
+                        #         x1 = int((cx - w / 2) * 512)
+                        #         y1 = int((cy - h / 2) * 512)
+                        #         x2 = int((cx + w / 2) * 512)
+                        #         y2 = int((cy + h / 2) * 512)
+
+                        #         # Draw the rectangle on the image
+                        #         cv2.rectangle(vis_val_gt, (x1, y1), (x2, y2), (0, 255, 0), 2)  # Green box with thickness 2
+
+                        #     vis_val_gt = torch.tensor(vis_val_gt)
+                        #     vis_val_gt = vis_val_gt.cuda().permute(2,0,1).float() / 255.0
+                        #     vis_val_box.append(vis_val_gt)
+
+                        # vis_val_box = torch.stack(vis_val_box)        # b 3 512 512
+                        # wandb.log({f'sampling_val_iter{sampled_iter}_timestep{sampled_timestep}/val_vis_box{i}': wandb.Image(vis_val_box, caption=f'draw sampled val pred box on gt')})
+
 
             # log total psnr, ssim, lpips for val
             tot_val_psnr.append(torch.mean(metric_psnr(torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, min=0, max=1),torch.clamp((val_log_gt + 1) / 2, min=0, max=1))).item())
             tot_val_ssim.append(torch.mean(metric_ssim(torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, min=0, max=1),torch.clamp((val_log_gt + 1) / 2, min=0, max=1))).item())
             tot_val_lpips.append(torch.mean(metric_lpips(torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, min=0, max=1),torch.clamp((val_log_gt + 1) / 2, min=0, max=1))).item())
-            tot_val_dists.append(torch.mean(metric_dists(torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, min=0, max=1),torch.clamp((val_log_gt + 1) / 2, min=0, max=1))).item())
-            # tot_val_fid.append(torch.mean(metric_fid(torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, min=0, max=1),torch.clamp((val_log_gt + 1) / 2, min=0, max=1))).item())
-            tot_val_niqe.append(torch.mean(metric_niqe(torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, min=0, max=1),torch.clamp((val_log_gt + 1) / 2, min=0, max=1))).item())
-            tot_val_musiq.append(torch.mean(metric_musiq(torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, min=0, max=1),torch.clamp((val_log_gt + 1) / 2, min=0, max=1))).item())
-            tot_val_maniqa.append(torch.mean(metric_maniqa(torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, min=0, max=1),torch.clamp((val_log_gt + 1) / 2, min=0, max=1))).item())
-            tot_val_clipiqa.append(torch.mean(metric_clipiqa(torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, min=0, max=1),torch.clamp((val_log_gt + 1) / 2, min=0, max=1))).item())
-            
+
 
             # log sampling val imgs to wandb
             if accelerator.is_main_process and cfg.log_args.log_tool == 'wandb':
@@ -245,46 +241,27 @@ def main(args):
                         f'sampling_val_METRIC/val_lpips': torch.mean(metric_lpips(
                                                                                 torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, min=0, max=1),
                                                                                 torch.clamp((val_log_gt + 1) / 2, min=0, max=1))).item(),
-                        f'sampling_val_METRIC/val_dists': torch.mean(metric_dists(
-                                                                                torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, min=0, max=1),
-                                                                                torch.clamp((val_log_gt + 1) / 2, min=0, max=1))).item(),
-                        # f'sampling_val_METRIC/val_fid': torch.mean(metric_fid(
-                        #                                                                 torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, min=0, max=1),
-                        #                                                                 torch.clamp((val_log_gt + 1) / 2, min=0, max=1))).item(),
-                        f'sampling_val_METRIC/val_niqe': torch.mean(metric_niqe(
-                                                                                torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, min=0, max=1),
-                                                                                torch.clamp((val_log_gt + 1) / 2, min=0, max=1))).item(),
-                        f'sampling_val_METRIC/val_musiq': torch.mean(metric_musiq(
-                                                                                torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, min=0, max=1),
-                                                                                torch.clamp((val_log_gt + 1) / 2, min=0, max=1))).item(),
-                        f'sampling_val_METRIC/val_maniqa': torch.mean(metric_maniqa(
-                                                                                torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, min=0, max=1),
-                                                                                torch.clamp((val_log_gt + 1) / 2, min=0, max=1))).item(),
-                        f'sampling_val_METRIC/val_clipiqa': torch.mean(metric_clipiqa(
-                                                                                torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, min=0, max=1),
-                                                                                torch.clamp((val_log_gt + 1) / 2, min=0, max=1))).item(),
                         })
                 
                 # log sampling val images 
-                wandb.log({ f'sampling_val_FINAL_VIS/{val_batch_idx}_val_gt': wandb.Image((val_log_gt + 1) / 2, caption=f'gt_img'),
-                            f'sampling_val_FINAL_VIS/{val_batch_idx}_val_lq': wandb.Image(val_log_lq, caption=f'lq_img'),
-                            f'sampling_val_FINAL_VIS/{val_batch_idx}_val_cleaned': wandb.Image(val_log_clean, caption=f'cleaned_img'),
-                            f'sampling_val_FINAL_VIS/{val_batch_idx}_val_sampled': wandb.Image(torch.clip((pure_cldm.vae_decode(val_z) + 1) / 2, 0, 1), caption=f'sampled_img'),
-                            f'sampling_val_FINAL_VIS/{val_batch_idx}_val_prompt': wandb.Image(log_txt_as_img((256, 256), val_log_prompt), caption=f'prompt'),
+                wandb.log({ f'sampling_val_FINAL_VIS/val_gt': wandb.Image((val_log_gt + 1) / 2, caption=f'gt_img'),
+                            f'sampling_val_FINAL_VIS/val_lq': wandb.Image(val_log_lq, caption=f'lq_img'),
+                            f'sampling_val_FINAL_VIS/val_cleaned': wandb.Image(val_log_clean, caption=f'cleaned_img'),
+                            f'sampling_val_FINAL_VIS/val_sampled': wandb.Image(torch.clip((pure_cldm.vae_decode(val_z) + 1) / 2, 0, 1), caption=f'sampled_img'),
+                            f'sampling_val_FINAL_VIS/val_prompt': wandb.Image(log_txt_as_img((256, 256), val_log_prompt), caption=f'prompt'),
                         })
-                wandb.log({f'sampling_val_FINAL_VIS/{val_batch_idx}_val_all': wandb.Image(torch.concat([val_log_lq, val_log_clean, torch.clip((pure_cldm.vae_decode(val_z) + 1) / 2, 0, 1), val_log_gt], dim=2), caption='lq_clean_sample,gt')})
+                wandb.log({f'sampling_val_FINAL_VIS/val_all': wandb.Image(torch.concat([val_log_lq, val_log_clean, torch.clip((pure_cldm.vae_decode(val_z) + 1) / 2, 0, 1), val_log_gt], dim=2), caption='lq_clean_sample,gt')})
+
+        # put models back to training 
+        for model in models.values():
+            if isinstance(model, nn.Module):
+                model.train()
 
 
     # average using numpy
     tot_val_psnr = np.array(tot_val_psnr).mean()
     tot_val_ssim = np.array(tot_val_ssim).mean()
     tot_val_lpips = np.array(tot_val_lpips).mean()
-    tot_val_dists = np.array(tot_val_dists).mean()
-    # tot_val_fid = np.array(tot_val_fid).mean()
-    tot_val_niqe = np.array(tot_val_niqe).mean()
-    tot_val_musiq = np.array(tot_val_musiq).mean()
-    tot_val_maniqa = np.array(tot_val_maniqa).mean()
-    tot_val_clipiqa = np.array(tot_val_clipiqa).mean()
 
 
     # log total val metrics 
@@ -293,14 +270,13 @@ def main(args):
             f'sampling_val_METRIC/tot_val_psnr': tot_val_psnr,
             f'sampling_val_METRIC/tot_val_ssim': tot_val_ssim,
             f'sampling_val_METRIC/tot_val_lpips': tot_val_lpips,
-            f'sampling_val_METRIC/tot_val_dists': tot_val_dists,
-            # f'sampling_val_METRIC/tot_val_fid': tot_val_fid,
-            f'sampling_val_METRIC/tot_val_niqe': tot_val_niqe,
-            f'sampling_val_METRIC/tot_val_musiq': tot_val_musiq,
-            f'sampling_val_METRIC/tot_val_maniqa': tot_val_maniqa,
-            f'sampling_val_METRIC/tot_val_clipiqa': tot_val_clipiqa,
         })
         
+
+    # print end of experiment
+    if accelerator.is_main_process:
+        print("FINISH !!")
+
 
 if __name__ == "__main__":
     parser = ArgumentParser()
