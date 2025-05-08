@@ -14,15 +14,21 @@ import torch
 
 
 def load_experiment_settings(accelerator, cfg):
-
-    # EXPERIMENT NAME
-    datasets='_'.join((cfg.dataset.train.params.data_args['datasets']))
-    exp_name = f"{cfg.exp_args.log_user}_{cfg.exp_args.log_server}_{cfg.exp_args.log_gpu}_{cfg.exp_args.mode}_DATA_{datasets}_MODEL_{cfg.exp_args.model_name}_FT_{cfg.exp_args.finetuning_method}_bs{cfg.train.batch_size}_lr{cfg.train.learning_rate}_{cfg.exp_args.log_additional_msg}"
+    
+    if cfg.exp_args.mode == 'TRAIN':
+        datasets='_'.join((cfg.dataset.train.params.data_args['datasets']))
+        exp_name = f"{cfg.exp_args.log_user}_{cfg.exp_args.log_server}_{cfg.exp_args.log_gpu}_{cfg.exp_args.mode}_DATA_{datasets}_MODEL_{cfg.exp_args.model_name}_FT_{cfg.exp_args.finetuning_method}_bs{cfg.train.batch_size}_lr{cfg.train.learning_rate}_{cfg.exp_args.log_additional_msg}"
+    
+    elif cfg.exp_args.mode == 'VAL':
+        datasets = cfg.dataset.val_dataset_name 
+        exp_name = f"{cfg.exp_args.log_user}_{cfg.exp_args.log_server}_{cfg.exp_args.log_gpu}_{cfg.exp_args.mode}_DATA_{datasets}_MODEL_{cfg.exp_args.model_name}_{cfg.exp_args.log_additional_msg}"
+    
     
     if accelerator.is_main_process:
         print('='*130)
         print('EXPERIMENT NAME: ', exp_name)
         print('='*130)
+
 
     # setup an experiment folder
     exp_dir = cfg.train.exp_dir
@@ -46,38 +52,51 @@ def load_experiment_settings(accelerator, cfg):
 
 def load_data(accelerator, cfg):
 
-    # set dataset 
-    train_ds = instantiate_from_config(cfg.dataset.train)
-    val_ds = instantiate_from_config(cfg.dataset.val)
-    
     
     if cfg.dataset.dataset_type == 'realsr':
         collate_fn = collate_fn_real
     elif cfg.dataset.dataset_type == 'codeformer':
         collate_fn = collate_fn_code 
 
+    if cfg.exp_args.mode == 'TRAIN':
+        train_ds = instantiate_from_config(cfg.dataset.train)
+        val_ds = instantiate_from_config(cfg.dataset.val)
+        
+        # set data loader 
+        train_loader = DataLoader(
+            dataset=train_ds,
+            batch_size=cfg.train.batch_size,
+            num_workers=cfg.train.num_workers,
+            shuffle=True,
+            drop_last=True,
+            pin_memory=True,
+            collate_fn=collate_fn
+        )
+        val_loader = DataLoader(
+            dataset=val_ds,
+            batch_size=cfg.val.batch_size,
+            num_workers=cfg.val.num_workers,
+            shuffle=False,
+            drop_last=True,
+            pin_memory=True,
+            collate_fn=collate_fn
+        )
 
-    # set data loader 
-    train_loader = DataLoader(
-        dataset=train_ds,
-        batch_size=cfg.train.batch_size,
-        num_workers=cfg.train.num_workers,
-        shuffle=True,
-        drop_last=True,
-        pin_memory=True,
-        collate_fn=collate_fn
-    )
-    val_loader = DataLoader(
-        dataset=val_ds,
-        batch_size=cfg.val.batch_size,
-        num_workers=cfg.val.num_workers,
-        shuffle=False,
-        drop_last=True,
-        pin_memory=True,
-        collate_fn=collate_fn
-    )
+        return train_ds, val_ds, train_loader, val_loader 
+    
+    elif cfg.exp_args.mode == 'VAL':
+        val_ds = instantiate_from_config(cfg.dataset.val)
+        val_loader = DataLoader(
+            dataset=val_ds,
+            batch_size=cfg.val.batch_size,
+            num_workers=cfg.val.num_workers,
+            shuffle=False,
+            drop_last=True,
+            pin_memory=True,
+            collate_fn=collate_fn
+        )
 
-    return train_ds, val_ds, train_loader, val_loader 
+        return None, val_ds, None, val_loader 
 
 
 
