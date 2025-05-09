@@ -72,6 +72,8 @@ def main(args):
         lq_imgs_path = sorted([f'{cfg.dataset.lq_img_path}/{img}' for img in lq_imgs])
         len_val_ds = len(gt_imgs)
         
+        mode = cfg.dataset.data_args['mode']
+        model_H, model_W = cfg.dataset.data_args['model_img_size']
         
         # load json 
         json_path = cfg.dataset.gt_ann_path 
@@ -80,9 +82,7 @@ def main(args):
             json_data = sorted(json_data.items())
         
         val_gt_json = {}
-        
         for img_id, img_anns in json_data:
-            
             anns = img_anns['0']['text_instances']
             
             boxes=[]
@@ -109,20 +109,39 @@ def main(args):
                     continue
                 
                 
-                # process box 
+                # process box
                 box_xyxy = ann['bbox']
-                boxes.append(box_xyxy)
+                x1,y1,x2,y2 = box_xyxy
+                box_xywh = [ x1, y1, x2-x1, y2-y1 ]
+                box_xyxy_scaled = list(map(lambda x: x/model_H, box_xyxy))  # scale box coord to [0,1]
+                x1,y1,x2,y2 = box_xyxy_scaled 
+                box_cxcywh = [(x1+x2)/2, (y1+y2)/2, x2-x1, y2-y1]   # xyxy -> cxcywh
+                # select box format
+                if cfg.dataset.data_args['bbox_format'] == 'xywh_unscaled':
+                    processed_box = box_xywh
+                    processed_box = list(map(lambda x: int(x), processed_box))
+                elif cfg.dataset.data_args['bbox_format'] == 'xyxy_scaled':
+                    processed_box = box_xyxy_scaled
+                    processed_box = list(map(lambda x: round(x,4), processed_box))
+                elif cfg.dataset.data_args['bbox_format'] == 'cxcywh_scaled':
+                    processed_box = box_cxcywh
+                    processed_box = list(map(lambda x: round(x,4), processed_box))
+                boxes.append(processed_box)
                 
                 
                 # process polygon
                 poly = np.array(ann['polygon']).astype(np.int32)    # 16 2
-                polys.append(poly)
+                # scale poly
+                poly_scaled = poly / np.array([model_W, model_H])
+                polys.append(poly_scaled)
 
 
             # check is anns are properly processed
-            assert len(boxes) == len(texts) == len(text_encs) == len(polys), f" Check loader!"
+            assert len(boxes) == len(texts) == len(text_encs) == len(polys), f" Check len"
             if len(boxes) == 0 or len(polys) == 0:
                     continue
+            
+            
             # process prompt
             if cfg.exp_args.use_gtprompt:
                 caption = [f'"{txt}"' for txt in texts]
@@ -131,7 +150,7 @@ def main(args):
                     prompt = f"A realistic scene where the texts {', '.join(caption) } appear clearly on signs, boards, buildings, or other objects."
                 elif cfg.exp_args.gtprompt_style == 'TAG':
                     prompt = f"{', '.join(caption)}"
-            else:
+            elif cfg.exp_args.use_nullprompt:
                 prompt=""
             prompts.append(prompt)
             
@@ -214,6 +233,8 @@ def main(args):
     gen.manual_seed(25)
     
     
+    MODE = cfg.exp_args.mode
+    
     # put model on eval
     for model in models.values():
         if isinstance(model, nn.Module):
@@ -244,8 +265,14 @@ def main(args):
         
         val_gt = preprocess_gt(gt_img).unsqueeze(0).to(device)  # 1 3 512 512
         val_lq = preprocess_lq(lq_img).unsqueeze(0).to(device)  # 1 3 512 512
-        val_prompt = val_gt_json[gt_id]['prompts']
         val_bs, _, val_H, val_W = val_gt.shape
+        
+        val_boxes = val_gt_json[gt_id]['boxes']
+        val_texts = val_gt_json[gt_id]['texts']
+        val_text_encs = val_gt_json[gt_id]['text_encs']
+        val_polys = val_gt_json[gt_id]['polys']
+        val_prompt = val_gt_json[gt_id]['prompts']
+
         
         with torch.no_grad():
             # val_z_0 = pure_cldm.vae_encode(val_gt)
@@ -282,9 +309,8 @@ def main(args):
             )
 
             # =========================== OCR ===========================
-            # if cfg.exp_args.model_name == 'diffbir_testr':
-            if False:
-
+            if cfg.exp_args.model_name == 'diffbir_testr':
+            
                 # process annotations for OCR val loss 
                 val_targets=[]
                 for i in range(val_bs):
@@ -292,8 +318,8 @@ def main(args):
                     tmp_dict={}
                     tmp_dict['labels'] = torch.tensor([0]*num_box).cuda()  # 0 for text
                     tmp_dict['boxes'] = torch.tensor(val_boxes[i]).cuda()
-                    tmp_dict['texts'] = val_text_encs[i]
-                    tmp_dict['ctrl_points'] = val_polys[i]
+                    tmp_dict['texts'] = torch.tensor(val_text_encs[i], dtype=torch.int32).cuda()
+                    tmp_dict['ctrl_points'] = torch.tensor(val_polys[i], dtype=torch.float32).cuda()
                     val_targets.append(tmp_dict)
 
 
@@ -301,17 +327,7 @@ def main(args):
                 for sampled_iter, sampled_timestep, unet_feats in val_sampled_unet_feats:
 
                     # OCR model forward pass
-                    sampling_val_ocr_loss_dict, sampling_val_ocr_results = models['testr'](unet_feats, val_targets)
-                    # val ocr total loss
-                    sampling_val_ocr_tot_loss = sum(sampling_val_ocr_loss_dict.values())
-
-
-                    # log sampling train loss and box to wandb
-                    if accelerator.is_main_process and cfg.log_args.log_tool == 'wandb':
-                        for ocr_key, ocr_val in sampling_val_ocr_loss_dict.items():
-                            wandb.log({f"sampling_val_LOSS_iter{sampled_iter}_timestep{sampled_timestep}/{ocr_key}": ocr_val.item()})
-                        wandb.log({f"sampling_val_LOSS_iter{sampled_iter}_timestep{sampled_timestep}/ocr_tot_loss": sampling_val_ocr_tot_loss.item()})
-
+                    _, sampling_val_ocr_results = models['testr'](unet_feats, val_targets, MODE)
 
                     # vis poly and text
                     for i in range(M):
@@ -332,8 +348,6 @@ def main(args):
                         # cv2.imwrite(f'./tmp{i}.jpg', vis_val_gt[...,::-1])
                         if accelerator.is_main_process and cfg.log_args.log_tool == 'wandb':
                             wandb.log({f'sampling_val_VIS_iter{sampled_iter}_timestep{sampled_timestep}/{val_batch_idx}_poly{i}': wandb.Image(vis_val_gt, caption=f'draw sampled val ocr results on gt')})
-                            
-            
             
 
             restored_img = torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, min=0, max=1)   # 1 3 512 512

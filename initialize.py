@@ -29,6 +29,8 @@ def load_experiment_settings(accelerator, cfg):
         datasets = cfg.dataset.val_dataset_name 
     
         exp_name = f"{cfg.exp_args.log_user}_{cfg.exp_args.log_server}_{cfg.exp_args.log_gpu}_{cfg.exp_args.mode}_DATA_{datasets}_MODEL_{cfg.exp_args.model_name}_{cfg.exp_args.log_additional_msg}"
+        exp_dir=None
+        ckpt_dir=None
     
     
     if accelerator.is_main_process:

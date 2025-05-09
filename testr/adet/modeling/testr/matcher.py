@@ -65,6 +65,7 @@ class CtrlPointHungarianMatcher(nn.Module):
             # FIXME: hack here for label ID 0
             cost_class = (pos_cost_class[..., 0] - neg_cost_class[..., 0]).mean(-1, keepdims=True)
 
+            breakpoint()
             cost_kpts = torch.cdist(out_pts, tgt_pts, p=1)
             
             C = self.class_weight * cost_class + self.coord_weight * cost_kpts

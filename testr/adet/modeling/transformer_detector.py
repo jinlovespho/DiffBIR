@@ -158,7 +158,7 @@ class TransformerDetector(nn.Module):
         images = ImageList.from_tensors(images)
         return images
 
-    def forward(self, extracted_feats, targets):
+    def forward(self, extracted_feats, targets, MODE=None):
         """
         Args:
             batched_inputs: a list, batched outputs of :class:`DatasetMapper` .
@@ -182,6 +182,7 @@ class TransformerDetector(nn.Module):
                 "pred_boxes", "pred_classes", "scores", "pred_masks", "pred_keypoints"
         """
 
+        # breakpoint()
         # images = self.preprocess_image(batched_inputs)
         output = self.testr(extracted_feats)
 
@@ -223,15 +224,19 @@ class TransformerDetector(nn.Module):
         image_sizes = [(512,512) for _ in range(bs)]
 
 
-        # gt_instances = [x["instances"].to(self.device) for x in batched_inputs]
-        # targets = self.prepare_targets(gt_instances)
-        loss_dict = self.criterion(output, targets)
-        weight_dict = self.criterion.weight_dict
-        for k in loss_dict.keys():
-            if k in weight_dict:
-                loss_dict[k] *= weight_dict[k]
+        if MODE == 'TRAIN':
+            # gt_instances = [x["instances"].to(self.device) for x in batched_inputs]
+            # targets = self.prepare_targets(gt_instances)
+            loss_dict = self.criterion(output, targets)
+            weight_dict = self.criterion.weight_dict
+            for k in loss_dict.keys():
+                if k in weight_dict:
+                    loss_dict[k] *= weight_dict[k]
+                    
+        elif MODE == 'VAL':
+            loss_dict=None
+            
 
-        
         ctrl_point_cls = output["pred_logits"]          # b k 16 1
         ctrl_point_coord = output["pred_ctrl_points"]   # b k 16 2 
         text_pred = output["pred_texts"]                # b k 25 97
