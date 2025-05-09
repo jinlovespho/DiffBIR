@@ -17,16 +17,23 @@ conda create -n pho_diffbir python=3.10 -y
 conda activate pho_diffbir
 
 # install torch first
-pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cu121
+pip3 install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cu121
+
+pip3 install xformers==0.0.25.post1 --no-dependencies
 # then install other libraries
-pip install -r requirements.txt
+pip3 install -r requirements.txt
 # install detectron2 if detectron2 is not in the folder
 # python -m pip3 install 'git+https://github.com/facebookresearch/detectron2.git'
 cd detectron2 
-pip install -e .
+pip3 install -e .
 # install testr
 cd testr 
-pip install -e .
+pip3 install -e . 
+
+# debugging for error installation
+which python
+which pip
+which pip3
 ```
 
 
@@ -39,7 +46,6 @@ bash download_weights.sh
 ### Experiment config file location
 ```shell
 configs/train
-
 ```
 
 
