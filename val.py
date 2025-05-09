@@ -319,53 +319,31 @@ def main(args):
                 val_texts=val_gttexts,
                 val_prompt=val_prompt
             )
-
-
-            with open('./tmp.txt', 'w') as f:
-                val_prompt = val_prompt[0]
-                
-                if cfg.exp_args.use_gtprompt:
-                    f.write("** using GT prompt **\n\n")
-                    
-                elif cfg.exp_args.use_nullprompt:
-                    f.write("** using NULL prompt **\n\n")
-                    
-                elif cfg.exp_args.use_ocrprompt:
-                    f.write("** using OCR prompt **\n\n")
-                f.write('initial input prompt:\n')
-
-                width = 80
-                line_num = (len(val_prompt) // width)+1
-                
-                for i in range(line_num):
-                    i = i*width
-                    f.write(val_prompt[i:i+width]+"\n")
-
-                f.write('\n')
-                for ts_result in val_ts_results:
-                    timestep = ts_result['timestep']
-                    pred_texts = ', '.join(ts_result['pred_texts'])
-                    f.write(f"timestep: {timestep:<4} /  pred_texts: {pred_texts}\n")
-
-            with open('./tmp.txt', 'r') as f:
-                lines = f.readlines()
-
+            
+            # log val prompts
+            val_prompt = val_prompt[0]
+            lines = []
+            # Add header info
+            if cfg.exp_args.use_gtprompt:
+                lines.append("** using GT prompt **\n")
+            elif cfg.exp_args.use_nullprompt:
+                lines.append("** using NULL prompt **\n")
+            elif cfg.exp_args.use_ocrprompt:
+                lines.append("** using OCR prompt **\n")
+            # Format prompt
+            lines.append("initial input prompt:\n")
+            width = 80
+            for i in range(0, len(val_prompt), width):
+                lines.append(val_prompt[i:i+width] + "\n")
+            lines.append("\n")
+            # Add prediction results
+            for ts_result in val_ts_results:
+                timestep = ts_result['timestep']
+                pred_texts = ', '.join(ts_result['pred_texts'])
+                lines.append(f"timestep: {timestep:<4} /  pred_texts: {pred_texts}\n")
+            # Now convert the list of strings to image
             img_of_pred_text = text_to_image(lines)
-            os.remove('./tmp.txt')
-            
-            
-            # with open('./tmp.txt', 'w') as f:
-            #     f.write(f"initial_input_prompt: {val_prompt}" + "\n")
-            #     for ts_result in val_ts_results:
-            #         timestep = ts_result['timestep']
-            #         pred_texts = ts_result['pred_texts']
-            #         pred_texts = ', '.join(pred_texts)
-            #         f.write(f"timestep: {timestep:<4} /  pred_texts: {pred_texts}" + "\n")
-            # with open('./tmp.txt', 'r') as f:
-            #     lines = f.readlines()
-            # img_of_pred_text = text_to_image(lines)
-            # os.remove('./tmp.txt')
-            
+
             
             # # analyze text-spotting output results
             # for ts_result in val_ts_results:

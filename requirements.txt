@@ -1,4 +1,3 @@
-xformers==0.0.25.post1
 omegaconf==2.3.0
 accelerate==0.28.0
 einops==0.7.0

@@ -170,7 +170,7 @@ exp_args:
   save_val_img_dir: /media/dataset2/jinlovespho/nips2025/benchmarks/SAM_text_test
   neg_prompt: 
   cfg_scale: 
-  initial_prompt: An image containing random words and phrases in various fonts, sizes, and colors, scattered across a natural or urban background. The text is clearly visible and rendered in diverse styles.
+  initial_prompt: An image containing text in various fonts, sizes, colors, and orientations, embedded naturally or artificially in diverse scenes. The text may appear on signs, billboards, documents, product packaging, or surfaces with varying lighting, backgrounds, and occlusions.
   use_nullprompt: False
   use_gtprompt: True
   use_ocrprompt: False
