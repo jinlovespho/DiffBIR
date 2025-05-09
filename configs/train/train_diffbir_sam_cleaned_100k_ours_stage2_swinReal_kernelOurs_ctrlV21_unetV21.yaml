@@ -93,16 +93,6 @@ model:
       zero_snr: True
       parameterization: v
 
-#   # diffusion pipeline config
-#   diffusion:
-#     target: diffbir.model.gaussian_diffusion.Diffusion
-#     params:
-#       linear_start: 0.00085
-#       linear_end: 0.0120
-#       timesteps: 1000
-#       zero_snr: False
-#       parameterization: eps
-
 
 dataset:
   dataset_type: realsr
@@ -110,7 +100,7 @@ dataset:
   train:
     target: diffbir.dataset.pho_realesrgan.RealESRGANDataset
     params:
-      file_list: /media/dataset2/text_restoration/100K
+      file_list: /media/dataset2/text_restoration/100K_oldest
       # # Path to the file list.
       # file_metas:
       #   # The training set is formatted as a parquet file.
@@ -153,7 +143,7 @@ dataset:
       data_args: {
         'mode': 'TRAIN',
         'datasets':['sam_clean'], 
-        'ann_path':'/media/dataset2/text_restoration/100K/combined_restoration_dataset.json',
+        'ann_path':'/media/dataset2/text_restoration/100K_oldest/combined_restoration_dataset.json',
         # xywh_unscaled, xyxy_scaled, cxcywh_scaled
         'bbox_format': 'cxcywh_scaled', 
         'model_img_size': [512, 512],
@@ -164,7 +154,7 @@ dataset:
   val:
     target: diffbir.dataset.pho_realesrgan.RealESRGANDataset
     params:
-      file_list: /media/dataset2/text_restoration/100K
+      file_list: /media/dataset2/text_restoration/100K_oldest
       # # Path to the file list.
       # file_metas:
       #   # The training set is formatted as a parquet file.
@@ -207,7 +197,7 @@ dataset:
       data_args: {
         'mode': 'VAL',
         'datasets':['sam_clean'], 
-        'ann_path':'/media/dataset2/text_restoration/100K/combined_restoration_dataset.json',
+        'ann_path':'/media/dataset2/text_restoration/100K_oldest/combined_restoration_dataset.json',
         # xywh_unscaled, xyxy_scaled, cxcywh_scaled
         'bbox_format': 'cxcywh_scaled', 
         'model_img_size': [512, 512],
@@ -270,118 +260,6 @@ val_batch_transform:
 
 
 
-
-
-
-
-# train_batch_transform:
-#   target: diffbir.dataset.pho_batch_transform.RealESRGANBatchTransform
-#   params:
-#     use_sharpener: true
-#     queue_size: 48
-
-#     # First degradation process
-#     resize_prob: [0.2, 0.7, 0.1]  # unchanged
-#     resize_range: [0.5, 1.2]      # was [0.15, 1.5] → avoid extreme downscaling
-#     gaussian_noise_prob: 0.3     # was 0.5 → reduce chance of Gaussian noise
-#     noise_range: [1, 15]         # was [1, 30] → lower noise intensity
-#     poisson_scale_range: [0.05, 2]  # was [0.05, 3] → reduce poisson effect
-#     gray_noise_prob: 0.2         # was 0.4 → reduce probability of gray noise
-#     jpeg_range: [50, 95]         # was [30, 95] → reduce heavy JPEG compression
-
-#     # Second degradation process
-#     stage2_scale: 4              # unchanged
-#     second_blur_prob: 0.7        # was 0.8 → slightly reduce chance of second blur
-#     resize_prob2: [0.3, 0.4, 0.3]  # unchanged
-#     resize_range2: [0.6, 1.1]    # was [0.3, 1.2] → avoid strong downsizing
-#     gaussian_noise_prob2: 0.3    # was 0.5
-#     noise_range2: [1, 15]        # was [1, 25]
-#     poisson_scale_range2: [0.05, 1.5]  # was [0.05, 2.5]
-#     gray_noise_prob2: 0.2        # was 0.4
-#     jpeg_range2: [50, 95]        # was [30, 95]
-
-# val_batch_transform:
-#   target: diffbir.dataset.pho_batch_transform.RealESRGANBatchTransform
-#   params:
-#     use_sharpener: true
-#     queue_size: 32
-
-#     resize_prob: [0.2, 0.7, 0.1]
-#     resize_range: [0.5, 1.2]      # same as train
-#     gaussian_noise_prob: 0.3
-#     noise_range: [1, 15]
-#     poisson_scale_range: [0.05, 2]
-#     gray_noise_prob: 0.2
-#     jpeg_range: [50, 95]
-
-#     stage2_scale: 4
-#     second_blur_prob: 0.7
-#     resize_prob2: [0.3, 0.4, 0.3]
-#     resize_range2: [0.6, 1.1]
-#     gaussian_noise_prob2: 0.3
-#     noise_range2: [1, 15]
-#     poisson_scale_range2: [0.05, 1.5]
-#     gray_noise_prob2: 0.2
-#     jpeg_range2: [50, 95]
-
-
-
-# train_batch_transform:
-#   target: diffbir.dataset.pho_batch_transform.RealESRGANBatchTransform
-#   params:
-#     use_sharpener: true
-#     # Queue size of training pool, this should be multiples of batch_size (per GPU).
-#     queue_size: 48
-#     # the first degradation process
-#     resize_prob: [0.2, 0.7, 0.1] # up, down, keep
-#     resize_range: [0.15, 1.5]
-#     gaussian_noise_prob: 0.5
-#     noise_range: [1, 30]
-#     poisson_scale_range: [0.05, 3]
-#     gray_noise_prob: 0.4
-#     jpeg_range: [30, 95]
-
-#     # the second degradation process
-#     stage2_scale: 4
-#     second_blur_prob: 0.8
-#     resize_prob2: [0.3, 0.4, 0.3] # up, down, keep
-#     resize_range2: [0.3, 1.2]
-#     gaussian_noise_prob2: 0.5
-#     noise_range2: [1, 25]
-#     poisson_scale_range2: [0.05, 2.5]
-#     gray_noise_prob2: 0.4
-#     jpeg_range2: [30, 95]
-
-
-
-# val_batch_transform:
-#   target: diffbir.dataset.pho_batch_transform.RealESRGANBatchTransform
-#   params:
-#     use_sharpener: true
-#     # Queue size of training pool, this should be multiples of batch_size (per GPU).
-#     queue_size: 32
-#     # the first degradation process
-#     resize_prob: [0.2, 0.7, 0.1] # up, down, keep
-#     resize_range: [0.15, 1.5]
-#     gaussian_noise_prob: 0.5
-#     noise_range: [1, 30]
-#     poisson_scale_range: [0.05, 3]
-#     gray_noise_prob: 0.4
-#     jpeg_range: [30, 95]
-
-#     # the second degradation process
-#     stage2_scale: 4
-#     second_blur_prob: 0.8
-#     resize_prob2: [0.3, 0.4, 0.3] # up, down, keep
-#     resize_range2: [0.3, 1.2]
-#     gaussian_noise_prob2: 0.5
-#     noise_range2: [1, 25]
-#     poisson_scale_range2: [0.05, 2.5]
-#     gray_noise_prob2: 0.4
-#     jpeg_range2: [30, 95]
-
-
-
 # training args
 train:
   # pretrained sd v2.1 path
@@ -397,15 +275,15 @@ train:
   resume: ./weights/DiffBIR_v2.1.pt
   noise_aug_timestep: 0
   num_workers: 4
-  train_steps: 100000
-  ckpt_every: 25000
+  train_steps: 50000
+  ckpt_every: 10000
   log_loss_every: 50
   log_image_every: 500
   batch_size: 3
   log_num_train_img: 3
   learning_rate: 1e-4
   # experiment save directory path
-  exp_dir: ./model_ckpts/sam_cleaned_100k/stage1
+  exp_dir: ./model_ckpts/sam_cleaned_100k/stage2
 
 
 val:
@@ -425,21 +303,21 @@ log_args:
 
 exp_args:
   # NULLprompt_testrScratch
-  log_additional_msg: SAM100k_STAGE1_RESUME25k_GTprompt_swinReal_kernelOurs_ctrlV21_unetV21
+  log_additional_msg: SAM100k_STAGE2_GTprompt_swinReal_kernelOurs_ctrlV21_unetV21
   log_user: pho
   log_server: server4
-  log_gpu: gpu0
+  log_gpu: gpu23
   # choose from [TRAIN, INFERENCE]
   mode: TRAIN
   # choose from [diffbir, diffbir_testr]
-  model_name: diffbir
-  testr_ckpt_dir:
+  model_name: diffbir_testr
+  testr_ckpt_dir: ./weights/totaltext_testr_R_50_polygon.pth
   # finetuning_method: testr, ctrlnet, ctrlnet_and_testr, ctrlnet_and_unetAttn, ctrlnet_and_unetAttn_and_testr
-  finetuning_method: ctrlnet_and_unetAttn
+  finetuning_method: testr
   unet_feat_sampling_timestep: [10,20,30,40,50]
   # resume_ckpt_dir: model_ckpts/sam_cleaned_100k/stage1/pho_server4_gpu0_TRAIN_DATA_sam_clean_MODEL_diffbir_FT_ctrlnet_and_unetAttn_bs3_lr0.0001_SAM100k_STAGE1_GTprompt_swinReal_kernelOurs_ctrlV21_unetV21/0025000.pt
-  resume_ckpt_dir: model_ckpts/sam_cleaned_100k/stage1/pho_server4_gpu0_TRAIN_DATA_sam_clean_MODEL_diffbir_FT_ctrlnet_and_unetAttn_bs3_lr0.0001_SAM100k_STAGE1_RESUME25k_GTprompt_swinReal_kernelOurs_ctrlV21_unetV21/0050000.pt
-  ocr_loss_weight: 0.0
+  resume_ckpt_dir: ./model_ckpts/sam_cleaned_100k/stage1/pho_server4_gpu0_TRAIN_DATA_sam_clean_MODEL_diffbir_FT_ctrlnet_and_unetAttn_bs3_lr0.0001_SAM100k_STAGE1_RESUME25k_GTprompt_swinReal_kernelOurs_ctrlV21_unetV21/0050000.pt
+  ocr_loss_weight: 1.0
 
   
   
