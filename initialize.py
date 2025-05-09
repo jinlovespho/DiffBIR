@@ -19,24 +19,20 @@ def load_experiment_settings(accelerator, cfg):
         datasets='_'.join((cfg.dataset.train.params.data_args['datasets']))
         exp_name = f"{cfg.exp_args.log_user}_{cfg.exp_args.log_server}_{cfg.exp_args.log_gpu}_{cfg.exp_args.mode}_DATA_{datasets}_MODEL_{cfg.exp_args.model_name}_FT_{cfg.exp_args.finetuning_method}_bs{cfg.train.batch_size}_lr{cfg.train.learning_rate}_{cfg.exp_args.log_additional_msg}"
     
+        # setup an experiment folder
+        exp_dir = cfg.train.exp_dir
+        os.makedirs(exp_dir, exist_ok=True)
+        ckpt_dir = os.path.join(exp_dir, exp_name)
+        os.makedirs(ckpt_dir, exist_ok=True)
+        
     elif cfg.exp_args.mode == 'VAL':
         datasets = cfg.dataset.val_dataset_name 
+    
         exp_name = f"{cfg.exp_args.log_user}_{cfg.exp_args.log_server}_{cfg.exp_args.log_gpu}_{cfg.exp_args.mode}_DATA_{datasets}_MODEL_{cfg.exp_args.model_name}_{cfg.exp_args.log_additional_msg}"
     
     
     if accelerator.is_main_process:
-        print('='*130)
         print('EXPERIMENT NAME: ', exp_name)
-        print('='*130)
-
-
-    # setup an experiment folder
-    exp_dir = cfg.train.exp_dir
-    os.makedirs(exp_dir, exist_ok=True)
-    ckpt_dir = os.path.join(exp_dir, exp_name)
-    os.makedirs(ckpt_dir, exist_ok=True)
-
-    if accelerator.is_main_process:
         # setup logging tool
         if cfg.log_args.log_tool == 'wandb':
             wandb.login(key=cfg.log_args.wandb_key)
