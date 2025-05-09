@@ -160,11 +160,12 @@ class SpacedSampler(Sampler):
     ) -> torch.Tensor:
         if uncond is None or cfg_scale == 1.0:
             model_output = model(x, model_t, cond)
+            return model_output
         else:
-            model_cond = model(x, model_t, cond)
-            model_uncond = model(x, model_t, uncond)
+            model_cond, extracted_feat = model(x, model_t, cond)
+            model_uncond, _ = model(x, model_t, uncond)
             model_output = model_uncond + cfg_scale * (model_cond - model_uncond)
-        return model_output
+            return model_output, extracted_feat
 
     @torch.no_grad()
     def p_sample(
