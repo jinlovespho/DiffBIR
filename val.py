@@ -127,11 +127,15 @@ def main(args):
             if cfg.exp_args.use_gtprompt:
                 caption = [f'"{txt}"' for txt in texts]
                 # prompt = f"A high-quality photo containing the word {', '.join(caption) }."
-                prompt = f"A realistic scene where the texts {', '.join(caption) } appear clearly on signs, boards, buildings, or other objects."
+                if cfg.exp_args.gtprompt_style == 'CAPTION':
+                    prompt = f"A realistic scene where the texts {', '.join(caption) } appear clearly on signs, boards, buildings, or other objects."
+                elif cfg.exp_args.gtprompt_style == 'TAG':
+                    prompt = f"{', '.join(caption)}"
             else:
                 prompt=""
             prompts.append(prompt)
             
+
             val_gt_json[img_id] = {
                 'boxes': boxes,
                 'texts': texts,
@@ -240,14 +244,8 @@ def main(args):
         
         val_gt = preprocess_gt(gt_img).unsqueeze(0).to(device)  # 1 3 512 512
         val_lq = preprocess_lq(lq_img).unsqueeze(0).to(device)  # 1 3 512 512
+        val_prompt = val_gt_json[gt_id]['prompts']
         val_bs, _, val_H, val_W = val_gt.shape
-        
-        
-        if cfg.exp_args.use_gtprompt:
-            val_prompt = val_gt_json[gt_id]['prompts']
-        else:
-            val_prompt=[""]
-
         
         with torch.no_grad():
             # val_z_0 = pure_cldm.vae_encode(val_gt)
