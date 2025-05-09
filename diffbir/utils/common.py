@@ -314,6 +314,23 @@ def log_txt_as_img(wh, pos_prompts, neg_prompts):
     return torch.tensor(txts)
 
 
+def text_to_image(lines, image_width=800, line_height=20, font_size=16):
+    height = line_height * len(lines) + 20
+    img = Image.new("RGB", (image_width, height), color="white")
+    draw = ImageDraw.Draw(img)
+
+    try:
+        font = ImageFont.truetype("DejaVuSansMono.ttf", font_size)
+    except:
+        font = ImageFont.load_default()
+
+    for i, line in enumerate(lines):
+        draw.text((10, i * line_height), line.strip(), fill="black", font=font)
+
+    return img
+
+
+
 def to(obj, device):
     if torch.is_tensor(obj):
         return obj.to(device)

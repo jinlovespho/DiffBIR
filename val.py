@@ -8,7 +8,7 @@ from accelerate import Accelerator
 from accelerate.utils import set_seed
 from einops import rearrange
 from tqdm import tqdm
-from diffbir.utils.common import instantiate_from_config, to, log_txt_as_img
+from diffbir.utils.common import instantiate_from_config, to, log_txt_as_img, text_to_image
 from diffbir.model import ControlLDM, Diffusion
 from diffbir.sampler import SpacedSampler
 import initialize
@@ -143,15 +143,13 @@ def main(args):
             
             
             # process prompt
-            if cfg.exp_args.use_gtprompt:
-                caption = [f'"{txt}"' for txt in texts]
-                # prompt = f"A high-quality photo containing the word {', '.join(caption) }."
-                if cfg.exp_args.gtprompt_style == 'CAPTION':
-                    prompt = f"A realistic scene where the texts {', '.join(caption) } appear clearly on signs, boards, buildings, or other objects."
-                elif cfg.exp_args.gtprompt_style == 'TAG':
-                    prompt = f"{', '.join(caption)}"
-            elif cfg.exp_args.use_nullprompt:
-                prompt=""
+            caption = [f'"{txt}"' for txt in texts]
+            # prompt = f"A high-quality photo containing the word {', '.join(caption) }."
+            if cfg.exp_args.prompt_style == 'CAPTION':
+                prompt = f"A realistic scene where the texts {', '.join(caption) } appear clearly on signs, boards, buildings, or other objects."
+            elif cfg.exp_args.prompt_style == 'TAG':
+                prompt = f"{', '.join(caption)}"
+
             prompts.append(prompt)
             
 
@@ -160,7 +158,7 @@ def main(args):
                 'texts': texts,
                 'text_encs': text_encs,
                 'polys': polys,
-                'prompts': prompts
+                'gtprompts': prompts
             }
                     
         
@@ -268,11 +266,19 @@ def main(args):
         val_bs, _, val_H, val_W = val_gt.shape
         
         val_boxes = val_gt_json[gt_id]['boxes']
-        val_texts = val_gt_json[gt_id]['texts']
+        val_gttexts = val_gt_json[gt_id]['texts']
         val_text_encs = val_gt_json[gt_id]['text_encs']
         val_polys = val_gt_json[gt_id]['polys']
-        val_prompt = val_gt_json[gt_id]['prompts']
+        val_gtprompt = val_gt_json[gt_id]['gtprompts']
 
+
+        if cfg.exp_args.use_gtprompt:
+            val_prompt = val_gtprompt 
+        elif cfg.exp_args.use_nullprompt:
+            val_prompt = [""]
+        elif cfg.exp_args.use_ocrprompt:
+            val_prompt = [cfg.exp_args.initial_prompt]
+        
         
         with torch.no_grad():
             # val_z_0 = pure_cldm.vae_encode(val_gt)
@@ -294,8 +300,10 @@ def main(args):
             pure_noise = torch.randn((1, 4, 64, 64), generator=gen, device=device, dtype=torch.float32)
             # print(pure_noise)
             
+            models['testr'].test_score_threshold = 0.6     # default threshold=0.45
+            
             # sampling
-            val_z, val_sampled_unet_feats = sampler.sample(     # b 4 56 56
+            val_z, val_ts_results = sampler.sample(     # b 4 56 56
                 model=models['cldm'],
                 device=device,
                 steps=50,
@@ -305,22 +313,83 @@ def main(args):
                 cfg_scale=cfg_scale,
                 x_T = pure_noise,
                 progress=accelerator.is_main_process,
-                cfg=cfg
+                cfg=cfg, 
+                pure_cldm=pure_cldm,
+                ts_model = models['testr'],
+                val_texts=val_gttexts,
+                val_prompt=val_prompt
             )
 
-            # =========================== OCR ===========================
-            if cfg.exp_args.model_name == 'diffbir_testr':
+
+            with open('./tmp.txt', 'w') as f:
+                val_prompt = val_prompt[0]
+                
+                if cfg.exp_args.use_gtprompt:
+                    f.write("** using GT prompt **\n\n")
+                    
+                elif cfg.exp_args.use_nullprompt:
+                    f.write("** using NULL prompt **\n\n")
+                    
+                elif cfg.exp_args.use_ocrprompt:
+                    f.write("** using OCR prompt **\n\n")
+                f.write('initial input prompt:\n')
+
+                width = 80
+                line_num = (len(val_prompt) // width)+1
+                
+                for i in range(line_num):
+                    i = i*width
+                    f.write(val_prompt[i:i+width]+"\n")
+
+                f.write('\n')
+                for ts_result in val_ts_results:
+                    timestep = ts_result['timestep']
+                    pred_texts = ', '.join(ts_result['pred_texts'])
+                    f.write(f"timestep: {timestep:<4} /  pred_texts: {pred_texts}\n")
+
+            with open('./tmp.txt', 'r') as f:
+                lines = f.readlines()
+
+            img_of_pred_text = text_to_image(lines)
+            os.remove('./tmp.txt')
             
-                # process annotations for OCR val loss 
+            
+            # with open('./tmp.txt', 'w') as f:
+            #     f.write(f"initial_input_prompt: {val_prompt}" + "\n")
+            #     for ts_result in val_ts_results:
+            #         timestep = ts_result['timestep']
+            #         pred_texts = ts_result['pred_texts']
+            #         pred_texts = ', '.join(pred_texts)
+            #         f.write(f"timestep: {timestep:<4} /  pred_texts: {pred_texts}" + "\n")
+            # with open('./tmp.txt', 'r') as f:
+            #     lines = f.readlines()
+            # img_of_pred_text = text_to_image(lines)
+            # os.remove('./tmp.txt')
+            
+            
+            # # analyze text-spotting output results
+            # for ts_result in val_ts_results:
+            #     timestep = ts_result['timestep']
+            #     pred_texts = ts_result['pred_texts']
+            #     pred_prompt = ts_result['pred_prompt']
+            #     pred_polys = ts_result['pred_polys']
+            
+
+            # =========================== OCR ===========================
+            # if cfg.exp_args.model_name == 'diffbir_testr':
+            if False:
+            
+                # # process annotations for OCR val loss 
+                # val_targets=[]
+                # for i in range(val_bs):
+                #     num_box=len(val_boxes[i])
+                #     tmp_dict={}
+                #     tmp_dict['labels'] = torch.tensor([0]*num_box).cuda()  # 0 for text
+                #     tmp_dict['boxes'] = torch.tensor(val_boxes[i]).cuda()
+                #     tmp_dict['texts'] = torch.tensor(val_text_encs[i], dtype=torch.int32).cuda()
+                #     tmp_dict['ctrl_points'] = torch.tensor(val_polys[i], dtype=torch.float32).cuda()
+                #     val_targets.append(tmp_dict)
                 val_targets=[]
-                for i in range(val_bs):
-                    num_box=len(val_boxes[i])
-                    tmp_dict={}
-                    tmp_dict['labels'] = torch.tensor([0]*num_box).cuda()  # 0 for text
-                    tmp_dict['boxes'] = torch.tensor(val_boxes[i]).cuda()
-                    tmp_dict['texts'] = torch.tensor(val_text_encs[i], dtype=torch.int32).cuda()
-                    tmp_dict['ctrl_points'] = torch.tensor(val_polys[i], dtype=torch.float32).cuda()
-                    val_targets.append(tmp_dict)
 
 
                 # evaluate diffusion features for different timesteps
@@ -337,18 +406,29 @@ def main(args):
 
                         results_per_img = sampling_val_ocr_results[i]
 
+                        val_pred_texts=[]
                         for j in range(len(results_per_img.polygons)):
                             val_ctrl_pnt= results_per_img.polygons[j].view(16,2).cpu().detach().numpy().astype(np.int32)    # 32 -> 16 2
                             val_score = results_per_img.scores[j]                     # 1
                             val_rec = results_per_img.recs[j]
                             val_pred_text = decode(val_rec)
-
+                            val_pred_texts.append(val_pred_text)
+                            
                             cv2.polylines(vis_val_gt, [val_ctrl_pnt], True, (0,255,0), 2)
                             cv2.putText(vis_val_gt, val_pred_text, (val_ctrl_pnt[0][0], val_ctrl_pnt[0][1]-5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
                         # cv2.imwrite(f'./tmp{i}.jpg', vis_val_gt[...,::-1])
                         if accelerator.is_main_process and cfg.log_args.log_tool == 'wandb':
                             wandb.log({f'sampling_val_VIS_iter{sampled_iter}_timestep{sampled_timestep}/{val_batch_idx}_poly{i}': wandb.Image(vis_val_gt, caption=f'draw sampled val ocr results on gt')})
-            
+                        
+                        # process predicted texts from OCR
+                        caption = [f'"{txt}"' for txt in val_pred_texts] 
+                        if cfg.exp_args.prompt_style == 'CAPTION':
+                            val_pred_prompt = f"A realistic scene where the texts {', '.join(caption) } appear clearly on signs, boards, buildings, or other objects."
+                        elif cfg.exp_args.prompt_style == 'TAG':
+                            val_pred_prompt = f"{', '.join(caption)}"
+                        
+                        breakpoint()
+
 
             restored_img = torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, min=0, max=1)   # 1 3 512 512
             # restored_img = torch.clip((pure_cldm.vae_decode(val_z) + 1) / 2, min=0, max=1)   # 1 3 512 512
@@ -411,10 +491,11 @@ def main(args):
                 wandb.log({ f'sampling_val_FINAL_VIS/{val_batch_idx}_val_gt': wandb.Image((val_gt + 1) / 2, caption=f'gt_img'),
                             f'sampling_val_FINAL_VIS/{val_batch_idx}_val_lq': wandb.Image(val_lq, caption=f'lq_img'),
                             f'sampling_val_FINAL_VIS/{val_batch_idx}_val_cleaned': wandb.Image(val_clean, caption=f'cleaned_img'),
-                            f'sampling_val_FINAL_VIS/{val_batch_idx}_val_sampled': wandb.Image(torch.clip((pure_cldm.vae_decode(val_z) + 1) / 2, 0, 1), caption=f'sampled_img'),
-                            f'sampling_val_FINAL_VIS/{val_batch_idx}_val_prompts': wandb.Image(log_txt_as_img((512, 256), val_prompt, val_neg_prompt), caption='positive and negative prompts'),
+                            f'sampling_val_FINAL_VIS/{val_batch_idx}_val_sampled': wandb.Image(torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, 0, 1), caption=f'sampled_img'),
+                            # f'sampling_val_FINAL_VIS/{val_batch_idx}_val_prompts': wandb.Image(log_txt_as_img((128, 256), val_prompt, val_neg_prompt), caption='positive and negative prompts'),
+                            f'sampling_val_FINAL_VIS/{val_batch_idx}_val_prompts': wandb.Image(img_of_pred_text, caption='prompts used for sampling'),
                         })
-                wandb.log({f'sampling_val_FINAL_VIS/{val_batch_idx}_val_all': wandb.Image(torch.concat([val_lq, val_clean, torch.clip((pure_cldm.vae_decode(val_z) + 1) / 2, 0, 1), val_gt], dim=2), caption='lq_clean_sample,gt')})
+                wandb.log({f'sampling_val_FINAL_VIS/{val_batch_idx}_val_all': wandb.Image(torch.concat([val_lq, val_clean, torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, 0, 1), val_gt], dim=2), caption='lq_clean_sample,gt')})
         
         
     # average using numpy

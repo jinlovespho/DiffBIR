@@ -96,9 +96,9 @@ model:
 
 dataset:
   val_dataset_name: samtext_test
-  gt_img_path: /media/dataset2/text_restoration/100K/images/test
+  gt_img_path: /media/dataset2/text_restoration/100K/test
   lq_img_path: /media/dataset2/text_restoration/SAM_text_test
-  gt_ann_path: /media/dataset2/text_restoration/100K/images/test/dataset.json
+  gt_ann_path: /media/dataset2/text_restoration/100K/test/dataset.json
   data_args: {
         'mode': 'VAL',
         # xywh_unscaled, xyxy_scaled, cxcywh_scaled
@@ -153,8 +153,8 @@ exp_args:
   # choose from [TRAIN, VAL]
   mode: VAL
   # NULLprompt_testrScratch
-  log_additional_msg: JIHYE_STAGE3_swinReal_kernelReal_ctrlV21_unetV21_GTprompt_TAGstyle
-  # log_additional_msg: PHO_STAGE3_swinReal_kernelReal_ctrlV21_unetV21_GTprompt_TAGstyle
+  log_additional_msg: JIHYE_STAGE3_swinReal_kernelReal_ctrlV21_unetV21_TSprompt_TAGstyle
+  # log_additional_msg: PHO_STAGE3_swinReal_kernelReal_ctrlV21_unetV21_TSprompt_TAGstyle
   log_user: pho
   log_server: server4
   log_gpu: gpu3
@@ -170,11 +170,12 @@ exp_args:
   save_val_img_dir: /media/dataset2/jinlovespho/nips2025/benchmarks/SAM_text_test
   neg_prompt: 
   cfg_scale: 
+  initial_prompt: An image containing random words and phrases in various fonts, sizes, and colors, scattered across a natural or urban background. The text is clearly visible and rendered in diverse styles.
   use_nullprompt: False
   use_gtprompt: True
   use_ocrprompt: False
   # when use_gtprompt==True, choose from [CAPTION, TAG]
-  gtprompt_style: TAG
+  prompt_style: TAG
 
   
   

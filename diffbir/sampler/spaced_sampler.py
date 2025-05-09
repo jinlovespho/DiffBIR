@@ -9,6 +9,7 @@ from ..model.gaussian_diffusion import extract_into_tensor
 from ..model.cldm import ControlLDM
 from ..utils.common import make_tiled_fn, trace_vram_usage
 
+from diffbir.dataset.pho_utils import encode, decode 
 
 # https://github.com/openai/guided-diffusion/blob/main/guided_diffusion/respace.py
 def space_timesteps(num_timesteps, section_counts):
@@ -207,7 +208,11 @@ class SpacedSampler(Sampler):
         tile_stride: int = -1,
         x_T: torch.Tensor | None = None,
         progress: bool = True,
-        cfg=None
+        cfg=None,
+        pure_cldm=None,
+        ts_model=None,
+        val_texts=None,
+        val_prompt=None
     ) -> torch.Tensor:
 
         self.make_schedule(steps)
@@ -240,6 +245,9 @@ class SpacedSampler(Sampler):
         sampling_steps = cfg.exp_args['unet_feat_sampling_timestep']
         sampled_unet_feats = []
 
+        # breakpoint()
+        
+        ts_results=[]
         for i, current_timestep in enumerate(iterator):
             # print(i, timestep)
             model_t = torch.full((bs,), current_timestep, device=device, dtype=torch.long)
@@ -254,11 +262,54 @@ class SpacedSampler(Sampler):
                 uncond,
                 cur_cfg_scale,
             )
+             
+            # Text-spotting model forward pass 
+            _, sampling_val_ocr_results = ts_model(extracted_feats, None, cfg.exp_args.mode)
+            
+            results_per_img = sampling_val_ocr_results[0]
 
-            # JLP 
-            if i+1 in sampling_steps:
-                sampled_unet_feats.append( (i+1, current_timestep, extracted_feats) )
+            pred_texts=[]
+            pred_polys=[]
+            
+            for j in range(len(results_per_img.polygons)):
+                val_ctrl_pnt= results_per_img.polygons[j].view(16,2).cpu().detach().numpy().astype(np.int32)    # 32 -> 16 2
+                # val_score = results_per_img.scores[j]                     # 1
+                val_rec = results_per_img.recs[j]
+                val_pred_text = decode(val_rec)
+                
+                pred_polys.append(val_ctrl_pnt)
+                pred_texts.append(val_pred_text)
+                
+                
+            # process predicted texts from OCR
+            if cfg.exp_args.use_gtprompt or cfg.exp_args.use_nullprompt :
+                pred_prompt = val_prompt 
+                pred_texts = val_texts
+                
+            elif cfg.exp_args.use_ocrprompt:
+                caption = [f'"{txt}"' for txt in pred_texts] 
+                if cfg.exp_args.prompt_style == 'CAPTION':
+                    pred_prompt = f"A realistic scene where the texts {', '.join(caption) } appear clearly on signs, boards, buildings, or other objects."
+                elif cfg.exp_args.prompt_style == 'TAG':
+                    pred_prompt = f"{', '.join(caption)}"
+                    
+                
+                cond['c_txt'] = pure_cldm.clip.encode(pred_prompt)  # b 77 1024
+
+
+            ts_results.append(
+                dict(
+                    timestep = current_timestep,
+                    pred_texts = pred_texts,
+                    pred_prompt = pred_prompt,
+                    pred_polys = pred_polys
+                )
+            )
+            
+            # # JLP 
+            # if i+1 in sampling_steps:
+            #     sampled_unet_feats.append( (i+1, current_timestep, extracted_feats) )
 
         if tiled:   # f
             model.forward = forward
-        return x, sampled_unet_feats 
+        return x, ts_results 
