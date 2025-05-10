@@ -186,15 +186,15 @@ train:
   resume: ./weights/DiffBIR_v2.1.pt  
   noise_aug_timestep: 0
   num_workers: 4
-  train_steps: 2500  # 100,000 for 30 epoch, 50,000 for 15 epoch, 10,000 for 3 epoch, 2,500 for 0.75epoch
-  ckpt_every: 500
+  train_steps: 10000  # 100,000 for 30 epoch, 50,000 for 15 epoch, 10,000 for 3 epoch, 2,500 for 0.75epoch
+  ckpt_every: 2000
   log_loss_every: 50
   log_image_every: 500
   batch_size: 32
   log_num_train_img: 32
-  learning_rate: 5e-5
+  learning_rate: 1e-4
   # experiment save directory path
-  exp_dir: ./model_ckpts/sam_cleaned_100k/stage1
+  exp_dir: ./model_ckpts/sam_cleaned_100k/stage2
 
 
 
@@ -215,20 +215,20 @@ log_args:
 
 exp_args:
   # NULLprompt_testrScratch
-  log_additional_msg: SAM100k_STAGE1_GTprompt_swinCode_kernelOurs_ctrlV21_unetV21
-  log_user: pho
+  log_additional_msg: SAM100k_STAGE2_testrPretrained_GTprompt_swinCode_kernelOurs_ctrlV21_unetV21
+  log_user: jihye
   log_server: serverSAMSUNG
   log_gpu: gpu0123
   # choose from [TRAIN, INFERENCE]
   mode: TRAIN
   # choose from [diffbir, diffbir_testr]
-  model_name: diffbir
-  testr_ckpt_dir:
+  model_name: diffbir_testr
+  testr_ckpt_dir: ./weights/totaltext_testr_R_50_polygon.pth
   # finetuning_method: testr, ctrlnet, ctrlnet_and_testr, ctrlnet_and_unetAttn, ctrlnet_and_unetAttn_and_testr
-  finetuning_method: ctrlnet_and_unetAttn
+  finetuning_method: testr
   unet_feat_sampling_timestep: [10,20,30,40,50]
-  resume_ckpt_dir:
-  ocr_loss_weight: 0.0
+  resume_ckpt_dir: stage1/code-ours-v21-v21/ckpt/path
+  ocr_loss_weight: 1.0
 
   
   

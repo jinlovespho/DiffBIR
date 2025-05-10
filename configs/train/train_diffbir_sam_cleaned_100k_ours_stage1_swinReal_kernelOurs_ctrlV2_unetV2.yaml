@@ -276,8 +276,8 @@ train:
   resume: ./weights/v2.pth                
   noise_aug_timestep: 0
   num_workers: 4
-  train_steps: 50000  # 100,000 for 30 epoch, 50,000 for 15 epoch
-  ckpt_every: 10000
+  train_steps: 2500  # 100,000 for 30 epoch, 50,000 for 15 epoch, 10,000 for 3 epoch, 2,500 for 0.75epoch
+  ckpt_every: 500
   log_loss_every: 50
   log_image_every: 500
   batch_size: 32
