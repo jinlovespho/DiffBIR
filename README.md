@@ -101,3 +101,19 @@ bash run_script/train_script/run_train_diffbir_sam_cleaned_100k_ours_stage3_swin
 # config location: configs/train/train_diffbir_sam_cleaned_100k_ours_stage3_swinReal_kernelReal_ctrlV21_unetV21.yaml
 bash run_script/train_script/run_train_diffbir_sam_cleaned_100k_ours_stage3_swinReal_kernelReal_ctrlV21_unetV21.sh
 ```
+
+
+
+### 20250510 
+```shell
+# STAGE1
+bash run_script/train_script/run_train_diffbir_sam_cleaned_100k_ours_stage1_swinCode_kernelOurs_ctrlV2_unetV2.sh
+bash run_script/train_script/run_train_diffbir_sam_cleaned_100k_ours_stage1_swinCode_kernelOurs_ctrlV21_unetV21.sh
+bash run_script/train_script/run_train_diffbir_sam_cleaned_100k_ours_stage1_swinReal_kernelOurs_ctrlV2_unetV2.sh
+bash run_script/train_script/run_train_diffbir_sam_cleaned_100k_ours_stage1_swinReal_kernelOurs_ctrlV21_unetV21.sh 
+
+# STAGE2
+
+
+# STAGE3
+```

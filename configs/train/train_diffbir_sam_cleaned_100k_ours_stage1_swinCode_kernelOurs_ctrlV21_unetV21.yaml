@@ -94,8 +94,8 @@ model:
       linear_start: 0.00085
       linear_end: 0.0120
       timesteps: 1000
-      zero_snr: False
-      parameterization: eps
+      zero_snr: True
+      parameterization: v
 
 
 dataset:
@@ -176,14 +176,14 @@ train:
   # pretrained sd v2.1 path
   # sd_path: ./weights/v2-1_512-ema-pruned.ckpt           -> unetV2
   # sd_path: ./weights/sd2.1-base-zsnr-laionaes5.ckpt     -> unetV21
-  sd_path: ./weights/v2-1_512-ema-pruned.ckpt       
+  sd_path: ./weights/sd2.1-base-zsnr-laionaes5.ckpt 
   # stage 1 swinir path.
   # swinir_path: ./weights/codeformer_swinir.ckpt         -> swinCode
   # swinir_path: ./weights/realesrgan_s4_swinir_100k.pth  -> swinReal
   swinir_path: ./weights/codeformer_swinir.ckpt   
   # resume: ./weights/v2.pth                              -> ctrlV2
   # resume: ./weights/DiffBIR_v2.1.pt                     -> ctrlV21
-  resume: ./weights/v2.pth 
+  resume: ./weights/DiffBIR_v2.1.pt  
   noise_aug_timestep: 0
   num_workers: 4
   train_steps: 50000  # 100,000 for 30 epoch, 50,000 for 15 epoch
@@ -195,6 +195,7 @@ train:
   learning_rate: 5e-5
   # experiment save directory path
   exp_dir: ./model_ckpts/sam_cleaned_100k/stage1
+
 
 
 val:
@@ -214,7 +215,7 @@ log_args:
 
 exp_args:
   # NULLprompt_testrScratch
-  log_additional_msg: SAM100k_STAGE1_GTprompt_swinCode_kernelOurs_ctrlV2_unetV2
+  log_additional_msg: SAM100k_STAGE1_GTprompt_swinCode_kernelOurs_ctrlV21_unetV21
   log_user: pho
   log_server: serverSAMSUNG
   log_gpu: gpu0123
