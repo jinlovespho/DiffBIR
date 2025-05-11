@@ -329,9 +329,9 @@ def main(args):
             if cfg.exp_args.use_gtprompt:
                 lines.append(f"** using GT prompt w/ {cfg.exp_args.prompt_style}style **\n")
             elif cfg.exp_args.use_nullprompt:
-                lines.append(f"** using NULL prompt {cfg.exp_args.prompt_style}style **\n")
+                lines.append(f"** using NULL prompt w/ {cfg.exp_args.prompt_style}style **\n")
             elif cfg.exp_args.use_ocrprompt:
-                lines.append(f"** using OCR prompt {cfg.exp_args.prompt_style}style **\n")
+                lines.append(f"** using OCR prompt w/ {cfg.exp_args.prompt_style}style **\n")
             # Format prompt
             lines.append("initial input prompt:\n")
             width = 80
