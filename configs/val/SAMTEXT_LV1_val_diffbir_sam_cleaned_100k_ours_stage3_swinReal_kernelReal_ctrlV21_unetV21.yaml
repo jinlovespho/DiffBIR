@@ -152,10 +152,10 @@ exp_args:
   # choose from [TRAIN, VAL]
   mode: VAL
   # NULLprompt_testrScratch
-  # log_additional_msg: JIHYE_STAGE3_swinReal_kernelReal_ctrlV21_unetV21_OCRprompt0_TAGstyle
-  # log_additional_msg: PHO_STAGE3_swinReal_kernelReal_ctrlV21_unetV21_OCRprompt0_CAPTIONstyle
-  log_additional_msg: JIHYE_STAGE3_swinReal_kernelReal_ctrlV21_unetV21_GTrompt_TAGstyle
-  # log_additional_msg: PHO_STAGE3_swinReal_kernelReal_ctrlV21_unetV21_GTrompt_TAGstyle
+  # log_additional_msg: samtext_LV1_JIHYE_STAGE3_swinReal_kernelReal_ctrlV21_unetV21_OCRprompt0_TAGstyle
+  # log_additional_msg: samtext_LV1_PHO_STAGE3_swinReal_kernelReal_ctrlV21_unetV21_OCRprompt0_CAPTIONstyle
+  log_additional_msg: samtext_LV1_JIHYE_STAGE3_swinReal_kernelReal_ctrlV21_unetV21_GTrompt_TAGstyle
+  # log_additional_msg: samtext_LV1_PHO_STAGE3_swinReal_kernelReal_ctrlV21_unetV21_GTrompt_TAGstyle
   log_user: pho
   log_server: server8
   log_gpu: gpu1
@@ -167,7 +167,7 @@ exp_args:
   resume_ckpt_dir: ./model_ckpts/jihye/stage3/0020000_swinReal_kernelReal_v21.pt
   # resume_ckpt_dir: ./model_ckpts/pho/stage3/pho_server4_gpu2_TRAIN_DATA_sam_clean_MODEL_diffbir_testr_FT_ctrlnet_and_unetAttn_and_testr_bs3_lr1e-05_SAM100k_STAGE3_RESUME75k_GTprompt_testrPretrained_swinReal_kernelReal_ctrlV21_unetV21/0125000.pt
   ocr_loss_weight: 
-  save_val_img_dir: /home/cvlab08/projects/data2/jinlovespho/nips2025/benchmarks/SAM_text_test
+  save_val_img_dir: /home/cvlab08/projects/data2/jinlovespho/nips2025/benchmarks/SAMText_test_lv1
   neg_prompt: 
   cfg_scale: 
   initial_prompt: ""
