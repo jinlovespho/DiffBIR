@@ -61,7 +61,9 @@ def main(args):
         lq_imgs_path = sorted([f'{cfg.dataset.dataset_path}/test_LR/{img}' for img in lq_imgs])
         len_val_ds = len(gt_imgs)
     
-    elif cfg.dataset.val_dataset_name == 'samtext_test':
+    
+    elif cfg.dataset.val_dataset_name == 'samtext_test' or \
+         cfg.dataset.val_dataset_name == 'realbench' :
         gt_imgs = sorted(os.listdir(f'{cfg.dataset.gt_img_path}'))  
         lq_imgs = sorted(os.listdir(f'{cfg.dataset.lq_img_path}'))
         
@@ -325,11 +327,11 @@ def main(args):
             lines = []
             # Add header info
             if cfg.exp_args.use_gtprompt:
-                lines.append("** using GT prompt **\n")
+                lines.append(f"** using GT prompt w/ {cfg.exp_args.prompt_style}style **\n")
             elif cfg.exp_args.use_nullprompt:
-                lines.append("** using NULL prompt **\n")
+                lines.append(f"** using NULL prompt {cfg.exp_args.prompt_style}style **\n")
             elif cfg.exp_args.use_ocrprompt:
-                lines.append("** using OCR prompt **\n")
+                lines.append(f"** using OCR prompt {cfg.exp_args.prompt_style}style **\n")
             # Format prompt
             lines.append("initial input prompt:\n")
             width = 80
@@ -466,14 +468,13 @@ def main(args):
                         })
                 
                 # log sampling val images 
-                wandb.log({ f'sampling_val_FINAL_VIS/{val_batch_idx}_val_gt': wandb.Image((val_gt + 1) / 2, caption=f'gt_img'),
-                            f'sampling_val_FINAL_VIS/{val_batch_idx}_val_lq': wandb.Image(val_lq, caption=f'lq_img'),
-                            f'sampling_val_FINAL_VIS/{val_batch_idx}_val_cleaned': wandb.Image(val_clean, caption=f'cleaned_img'),
-                            f'sampling_val_FINAL_VIS/{val_batch_idx}_val_sampled': wandb.Image(torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, 0, 1), caption=f'sampled_img'),
-                            # f'sampling_val_FINAL_VIS/{val_batch_idx}_val_prompts': wandb.Image(log_txt_as_img((128, 256), val_prompt, val_neg_prompt), caption='positive and negative prompts'),
-                            f'sampling_val_FINAL_VIS/{val_batch_idx}_val_prompts': wandb.Image(img_of_pred_text, caption='prompts used for sampling'),
+                wandb.log({ f'sampling_val_FINAL_VIS/{gt_id}_val_gt': wandb.Image((val_gt + 1) / 2, caption=f'gt_img'),
+                            f'sampling_val_FINAL_VIS/{gt_id}_val_lq': wandb.Image(val_lq, caption=f'lq_img'),
+                            f'sampling_val_FINAL_VIS/{gt_id}_val_cleaned': wandb.Image(val_clean, caption=f'cleaned_img'),
+                            f'sampling_val_FINAL_VIS/{gt_id}_val_sampled': wandb.Image(torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, 0, 1), caption=f'sampled_img'),
+                            f'sampling_val_FINAL_VIS/{gt_id}_val_prompts': wandb.Image(img_of_pred_text, caption='prompts used for sampling'),
                         })
-                wandb.log({f'sampling_val_FINAL_VIS/{val_batch_idx}_val_all': wandb.Image(torch.concat([val_lq, val_clean, torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, 0, 1), val_gt], dim=2), caption='lq_clean_sample,gt')})
+                wandb.log({f'sampling_val_FINAL_VIS/{gt_id}_val_all': wandb.Image(torch.concat([val_lq, val_clean, torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, 0, 1), val_gt], dim=2), caption='lq_clean_sample,gt')})
         
         
     # average using numpy
