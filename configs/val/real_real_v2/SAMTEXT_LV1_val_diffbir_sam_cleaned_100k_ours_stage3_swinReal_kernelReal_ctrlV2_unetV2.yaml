@@ -1,0 +1,187 @@
+model:
+  cldm:
+    target: diffbir.model.cldm.ControlLDM
+    params:
+      latent_scale_factor: 0.18215
+      unet_cfg:
+        use_checkpoint: True
+        image_size: 32 # unused
+        in_channels: 4
+        out_channels: 4
+        model_channels: 320
+        attention_resolutions: [ 4, 2, 1 ]
+        num_res_blocks: 2
+        channel_mult: [ 1, 2, 4, 4 ]
+        num_head_channels: 64 # need to fix for flash-attn
+        use_spatial_transformer: True
+        use_linear_in_transformer: True
+        transformer_depth: 1
+        context_dim: 1024
+        legacy: False
+      vae_cfg:
+        embed_dim: 4
+        ddconfig:
+          double_z: true
+          z_channels: 4
+          resolution: 256
+          in_channels: 3
+          out_ch: 3
+          ch: 128
+          ch_mult:
+          - 1
+          - 2
+          - 4
+          - 4
+          num_res_blocks: 2
+          attn_resolutions: []
+          dropout: 0.0
+      clip_cfg:
+        embed_dim: 1024
+        vision_cfg:
+          image_size: 224
+          layers: 32
+          width: 1280
+          head_width: 80
+          patch_size: 14
+        text_cfg:
+          context_length: 77
+          vocab_size: 49408
+          width: 1024
+          heads: 16
+          layers: 24
+        layer: "penultimate"
+      controlnet_cfg:
+        use_checkpoint: True
+        image_size: 32 # unused
+        in_channels: 4
+        hint_channels: 4
+        model_channels: 320
+        attention_resolutions: [ 4, 2, 1 ]
+        num_res_blocks: 2
+        channel_mult: [ 1, 2, 4, 4 ]
+        num_head_channels: 64 # need to fix for flash-attn
+        use_spatial_transformer: True
+        use_linear_in_transformer: True
+        transformer_depth: 1
+        context_dim: 1024
+        legacy: False
+
+  swinir:
+    target: diffbir.model.swinir.SwinIR
+    params:
+      img_size: 64
+      patch_size: 1
+      in_chans: 3
+      embed_dim: 180
+      depths: [6, 6, 6, 6, 6, 6, 6, 6]
+      num_heads: [6, 6, 6, 6, 6, 6, 6, 6]
+      window_size: 8
+      mlp_ratio: 2
+      sf: 8
+      img_range: 1.0
+      upsampler: "nearest+conv"
+      resi_connection: "1conv"
+      unshuffle: True
+      unshuffle_scale: 8
+
+  diffusion:
+    target: diffbir.model.gaussian_diffusion.Diffusion
+    params:
+      linear_start: 0.00085
+      linear_end: 0.0120
+      timesteps: 1000
+      zero_snr: False
+      parameterization: eps
+
+
+dataset:
+  val_dataset_name: samtext_test
+  gt_img_path: /home/cvlab08/projects/data2/text_restoration/100K/test
+  lq_img_path: /home/cvlab08/projects/data2/text_restoration/SAMText_test_degradation/lv1
+  gt_ann_path: /home/cvlab08/projects/data2/text_restoration/100K/test/dataset.json
+  data_args: {
+        'mode': 'VAL',
+        # xywh_unscaled, xyxy_scaled, cxcywh_scaled
+        'bbox_format': 'cxcywh_scaled', 
+        'model_img_size': [512, 512],
+        }
+
+
+# training args
+train:
+  # pretrained sd v2.1 path
+  # sd_path: ./weights/v2-1_512-ema-pruned.ckpt           -> unetV2
+  # sd_path: ./weights/sd2.1-base-zsnr-laionaes5.ckpt     -> unetV21
+  sd_path: ./weights/v2-1_512-ema-pruned.ckpt     
+  # stage 1 swinir path.
+  # swinir_path: ./weights/codeformer_swinir.ckpt         -> swinCode
+  # swinir_path: ./weights/realesrgan_s4_swinir_100k.pth  -> swinReal
+  swinir_path: ./weights/realesrgan_s4_swinir_100k.pth
+  # resume: ./weights/v2.pth                              -> ctrlV2
+  # resume: ./weights/DiffBIR_v2.1.pt                     -> ctrlV21
+  resume: ./weights/v2.pth        
+  noise_aug_timestep: 
+  num_workers: 
+  train_steps: 
+  ckpt_every: 
+  log_loss_every: 
+  log_image_every: 
+  batch_size: 
+  log_num_train_img: 
+  learning_rate: 
+  # experiment save directory path
+  exp_dir: ./
+
+
+val:
+  num_workers: 
+  batch_size: 
+  log_num_val_img: 
+  log_image_every:
+
+
+
+log_args:
+  log_tool: wandb
+  wandb_key: e32eed0c2509bf898b850b0065ab62345005fb73
+  wandb_proj_name: DiffBIR_OCR_finetuning
+
+
+
+exp_args:
+  # choose from [TRAIN, VAL]
+  mode: VAL
+  # NULLprompt_testrScratch
+  log_additional_msg: samtext_LV1_JIHYE_STAGE3_swinReal_kernelReal_ctrlV2_unetV2_OCRprompt0_CAPTIONstyle
+  # log_additional_msg: samtext_LV1_JIHYE_STAGE3_swinReal_kernelReal_ctrlV2_unetV2_GTrompt_CAPTIONstyle
+  log_user: pho
+  log_server: server8
+  log_gpu: gpu1
+  # choose from [diffbir, diffbir_testr]
+  model_name: diffbir_testr
+  testr_ckpt_dir: 
+  finetuning_method: 
+  unet_feat_sampling_timestep: [10,20,30,40,50]
+  # resume_ckpt_dir: ./model_ckpts/jihye/stage3/0020000_swinReal_kernelReal_v21.pt
+  resume_ckpt_dir: model_ckpts/jihye/stage3/0020000_swinReal_kernelReal_v2.pt
+  # resume_ckpt_dir: ./model_ckpts/pho/stage3/pho_server4_gpu2_TRAIN_DATA_sam_clean_MODEL_diffbir_testr_FT_ctrlnet_and_unetAttn_and_testr_bs3_lr1e-05_SAM100k_STAGE3_RESUME75k_GTprompt_testrPretrained_swinReal_kernelReal_ctrlV21_unetV21/0125000.pt
+  ocr_loss_weight: 
+  # save_val_img_dir: /home/cvlab08/projects/data2/jinlovespho/nips2025/benchmarks/SAMText_test_lv1/real_real_v2
+  save_val_img_dir: /home/cvlab08/projects/data2/jinlovespho/nips2025/benchmarks/SAMText_test_lv1/real_real_v2
+  neg_prompt: 
+  cfg_scale: 
+  initial_prompt: ""
+  # initial_prompt: An image containing text in various fonts, sizes, colors, and orientations, embedded naturally or artificially in diverse scenes. The text may appear on signs, billboards, documents, product packaging, or surfaces with varying lighting, backgrounds, and occlusions.
+  # initial_prompt: An image containing text in various fonts, sizes, colors, orientations, and styles. 
+  use_nullprompt: False
+  use_gtprompt: False
+  use_ocrprompt: True
+  # when use_gtprompt==True, choose from [CAPTION, TAG]
+  prompt_style: CAPTION
+
+  
+  
+  
+
+  
+  

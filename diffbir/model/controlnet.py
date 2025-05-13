@@ -36,6 +36,7 @@ class ControlledUnetModel(UNetModel):
             h = module(h, emb, context)
             hs.append(h)
         
+        # breakpoint()
         h = self.middle_block(h, emb, context)
 
         if control is not None:
