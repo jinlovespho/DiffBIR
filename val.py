@@ -25,6 +25,7 @@ from diffbir.dataset.pho_utils import encode, decode
 from accelerate.utils import DistributedDataParallelKwargs
 from PIL import Image 
 import json 
+import csv
 
 
 def main(args):
@@ -77,6 +78,18 @@ def main(args):
         mode = cfg.dataset.data_args['mode']
         model_H, model_W = cfg.dataset.data_args['model_img_size']
         
+        # load llava caption
+        if cfg.exp_args.use_llavaprompt:
+            llava_dic={}
+            f = open(cfg.exp_args.llavaprompt_dir, 'r')
+            llava = csv.reader(f)
+            llava = sorted(list(llava))
+
+            for lva in llava:
+                lva_id=lva[0]
+                lva_prompt=lva[1].split(',')[0]
+                llava_dic[lva_id]=lva_prompt
+        
         # load json 
         json_path = cfg.dataset.gt_ann_path 
         with open(json_path, 'r') as f:
@@ -84,9 +97,9 @@ def main(args):
             json_data = sorted(json_data.items())
         
         val_gt_json = {}
-        for img_id, img_anns in json_data:
+        for idx, (img_id, img_anns) in enumerate(json_data):
             anns = img_anns['0']['text_instances']
-            
+                
             boxes=[]
             texts=[]
             text_encs=[]
@@ -151,9 +164,11 @@ def main(args):
                 prompt = f"A realistic scene where the texts {', '.join(caption) } appear clearly on signs, boards, buildings, or other objects."
             elif cfg.exp_args.prompt_style == 'TAG':
                 prompt = f"{', '.join(caption)}"
+            
+            if cfg.exp_args.use_llavaprompt:
+                prompt = llava_dic[img_id]
 
             prompts.append(prompt)
-            
 
             val_gt_json[img_id] = {
                 'boxes': boxes,
@@ -171,7 +186,6 @@ def main(args):
         len_val_ds = len(val_ds)
 
     
-
     # load models
     models, resume_ckpt_path = initialize.load_model(accelerator, device, args, cfg)
     
@@ -254,6 +268,43 @@ def main(args):
         T.ToTensor()
     ])
     
+    if cfg.exp_args.split == 0:
+        gt_imgs_path = gt_imgs_path[:125]
+        lq_imgs_path = lq_imgs_path[:125]
+
+    elif cfg.exp_args.split == 1:
+        gt_imgs_path = gt_imgs_path[125:250]
+        lq_imgs_path = lq_imgs_path[125:250]
+
+    elif cfg.exp_args.split == 2:
+        gt_imgs_path = gt_imgs_path[250:375]
+        lq_imgs_path = lq_imgs_path[250:375]
+
+    elif cfg.exp_args.split == 3:
+        gt_imgs_path = gt_imgs_path[375:500]
+        lq_imgs_path = lq_imgs_path[375:500]
+
+    elif cfg.exp_args.split == 4:
+        gt_imgs_path = gt_imgs_path[500:625]
+        lq_imgs_path = lq_imgs_path[500:625]
+
+    elif cfg.exp_args.split == 5:
+        gt_imgs_path = gt_imgs_path[625:750]
+        lq_imgs_path = lq_imgs_path[625:750]
+
+    elif cfg.exp_args.split == 6:
+        gt_imgs_path = gt_imgs_path[750:875]
+        lq_imgs_path = lq_imgs_path[750:875]
+
+    elif cfg.exp_args.split == 7:
+        gt_imgs_path = gt_imgs_path[875:]
+        lq_imgs_path = lq_imgs_path[875:]
+
+
+    elif cfg.exp_args.split is None:
+        pass 
+    
+    
     for val_batch_idx, (gt_img_path, lq_img_path) in enumerate(tqdm(zip(gt_imgs_path, lq_imgs_path), desc='val', total=len(gt_imgs_path))):
         
         gt_id = gt_img_path.split('/')[-1].split('.')[0]
@@ -274,13 +325,13 @@ def main(args):
         val_gtprompt = val_gt_json[gt_id]['gtprompts']
 
 
-        if cfg.exp_args.use_gtprompt:
+        if cfg.exp_args.use_gtprompt or cfg.exp_args.use_llavaprompt:
             val_prompt = val_gtprompt 
         elif cfg.exp_args.use_nullprompt:
             val_prompt = [""]
         elif cfg.exp_args.use_ocrprompt:
             val_prompt = [cfg.exp_args.initial_prompt]
-        
+            
         
         with torch.no_grad():
             # val_z_0 = pure_cldm.vae_encode(val_gt)
@@ -302,7 +353,11 @@ def main(args):
             pure_noise = torch.randn((1, 4, 64, 64), generator=gen, device=device, dtype=torch.float32)
             # print(pure_noise)
             
-            models['testr'].test_score_threshold = 0.6     # default threshold=0.45
+            if cfg.exp_args.model_name == 'diffbir_testr':
+                models['testr'].test_score_threshold = 0.5     # default threshold=0.45
+                ts_model = models['testr']
+            elif cfg.exp_args.model_name == 'diffbir':
+                ts_model = None
             
             # sampling
             val_z, val_ts_results = sampler.sample(     # b 4 56 56
@@ -317,7 +372,7 @@ def main(args):
                 progress=accelerator.is_main_process,
                 cfg=cfg, 
                 pure_cldm=pure_cldm,
-                ts_model = models['testr'],
+                ts_model = ts_model,
                 val_texts=val_gttexts,
                 val_prompt=val_prompt
             )
@@ -329,20 +384,27 @@ def main(args):
             if cfg.exp_args.use_gtprompt:
                 lines.append(f"** using GT prompt w/ {cfg.exp_args.prompt_style}style **\n")
             elif cfg.exp_args.use_nullprompt:
-                lines.append(f"** using NULL prompt w/ {cfg.exp_args.prompt_style}style **\n")
+                lines.append(f"** using NULL prompt **\n")
             elif cfg.exp_args.use_ocrprompt:
                 lines.append(f"** using OCR prompt w/ {cfg.exp_args.prompt_style}style **\n")
+            elif cfg.exp_args.use_llavaprompt:
+                lines.append(f"** using LLAVA prompt **\n")
+                
             # Format prompt
             lines.append("initial input prompt:\n")
             width = 80
             for i in range(0, len(val_prompt), width):
                 lines.append(val_prompt[i:i+width] + "\n")
             lines.append("\n")
-            # Add prediction results
-            for ts_result in val_ts_results:
-                timestep = ts_result['timestep']
-                pred_texts = ', '.join(ts_result['pred_texts'])
-                lines.append(f"timestep: {timestep:<4} /  pred_texts: {pred_texts}\n")
+            
+            if cfg.exp_args.model_name == 'diffbir_testr':
+                
+                # Add prediction results
+                for ts_result in val_ts_results:
+                    timestep = ts_result['timestep']
+                    pred_texts = ', '.join(ts_result['pred_texts'])
+                    lines.append(f"timestep: {timestep:<4} /  pred_texts: {pred_texts}\n")
+            
             # Now convert the list of strings to image
             img_of_pred_text = text_to_image(lines)
 

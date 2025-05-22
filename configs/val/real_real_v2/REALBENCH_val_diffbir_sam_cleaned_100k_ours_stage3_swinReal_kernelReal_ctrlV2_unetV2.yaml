@@ -152,8 +152,9 @@ exp_args:
   # choose from [TRAIN, VAL]
   mode: VAL
   # NULLprompt_testrScratch
+  log_additional_msg: realbench_JIHYE_STAGE3_swinReal_kernelReal_ctrlV2_unetV2_NULLprompt
+  # log_additional_msg: realbench_JIHYE_STAGE3_swinReal_kernelReal_ctrlV2_unetV2_GTrompt_TAGstyle
   # log_additional_msg: realbench_JIHYE_STAGE3_swinReal_kernelReal_ctrlV2_unetV2_OCRprompt0_TAGstyle
-  log_additional_msg: realbench_JIHYE_STAGE3_swinReal_kernelReal_ctrlV2_unetV2_GTrompt_TAGstyle
   log_user: pho
   log_server: server8
   log_gpu: gpu0
@@ -172,8 +173,8 @@ exp_args:
   initial_prompt: ""
   # initial_prompt: An image containing text in various fonts, sizes, colors, and orientations, embedded naturally or artificially in diverse scenes. The text may appear on signs, billboards, documents, product packaging, or surfaces with varying lighting, backgrounds, and occlusions.
   # initial_prompt: An image containing text in various fonts, sizes, colors, orientations, and styles. 
-  use_nullprompt: False
-  use_gtprompt: True
+  use_nullprompt: True
+  use_gtprompt: False
   use_ocrprompt: False
   # when use_gtprompt==True, choose from [CAPTION, TAG]
   prompt_style: TAG

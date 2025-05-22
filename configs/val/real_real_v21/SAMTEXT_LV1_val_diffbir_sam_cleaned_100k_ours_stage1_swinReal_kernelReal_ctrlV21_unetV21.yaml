@@ -90,8 +90,8 @@ model:
       linear_start: 0.00085
       linear_end: 0.0120
       timesteps: 1000
-      zero_snr: False
-      parameterization: eps
+      zero_snr: True
+      parameterization: v
 
 
 dataset:
@@ -112,14 +112,14 @@ train:
   # pretrained sd v2.1 path
   # sd_path: ./weights/v2-1_512-ema-pruned.ckpt           -> unetV2
   # sd_path: ./weights/sd2.1-base-zsnr-laionaes5.ckpt     -> unetV21
-  sd_path: ./weights/v2-1_512-ema-pruned.ckpt     
+  sd_path: ./weights/sd2.1-base-zsnr-laionaes5.ckpt       
   # stage 1 swinir path.
   # swinir_path: ./weights/codeformer_swinir.ckpt         -> swinCode
   # swinir_path: ./weights/realesrgan_s4_swinir_100k.pth  -> swinReal
   swinir_path: ./weights/realesrgan_s4_swinir_100k.pth
   # resume: ./weights/v2.pth                              -> ctrlV2
   # resume: ./weights/DiffBIR_v2.1.pt                     -> ctrlV21
-  resume: ./weights/v2.pth        
+  resume: ./weights/DiffBIR_v2.1.pt
   noise_aug_timestep: 
   num_workers: 
   train_steps: 
@@ -152,34 +152,39 @@ exp_args:
   # choose from [TRAIN, VAL]
   mode: VAL
   # NULLprompt_testrScratch
-  # log_additional_msg: samtext_LV1_JIHYE_FINAL_STAGE3_swinReal_kernelReal_ctrlV2_unetV2_NULLprompt
-  log_additional_msg: samtext_LV1_JIHYE_FINAL_STAGE3_swinReal_kernelReal_ctrlV2_unetV2_GTrompt_TAGstyle
-  # log_additional_msg: samtext_LV1_JIHYE_FINAL_STAGE3_swinReal_kernelReal_ctrlV2_unetV2_OCRprompt0_TAGstyle
+  # log_additional_msg: samtext_LV1_JIHYE_STAGE1_swinReal_kernelReal_ctrlV21_unetV21_NULLprompt
+  # log_additional_msg: samtext_LV1_JIHYE_STAGE1_swinReal_kernelReal_ctrlV21_unetV21_OCRprompt0_CAPTIONstyle
+  # log_additional_msg: samtext_LV1_JIHYE_STAGE1_swinReal_kernelReal_ctrlV21_unetV21_GTrompt_CAPTIONstyle
+  log_additional_msg: samtext_LV1_JIHYE_STAGE1_swinReal_kernelReal_ctrlV21_unetV21_LLAVAprompt
   log_user: pho
   log_server: server8
   log_gpu: gpu1
   # choose from [diffbir, diffbir_testr]
-  model_name: diffbir_testr
+  model_name: diffbir
   testr_ckpt_dir: 
   finetuning_method: 
   unet_feat_sampling_timestep: [10,20,30,40,50]
   # resume_ckpt_dir: ./model_ckpts/jihye/stage3/0020000_swinReal_kernelReal_v21.pt
   # resume_ckpt_dir: model_ckpts/jihye/stage3/0020000_swinReal_kernelReal_v2.pt
-  resume_ckpt_dir: model_ckpts/jihye/stage3/0065000_r_r_v2.pt
+  # resume_ckpt_dir: model_ckpts/jihye/stage3/0065000_r_r_v2.pt
+  # resume_ckpt_dir: model_ckpts/jihye/stage3/0065000.pt
+  resume_ckpt_dir: model_ckpts/jihye/stage1/0056000_real.pt
   # resume_ckpt_dir: ./model_ckpts/pho/stage3/pho_server4_gpu2_TRAIN_DATA_sam_clean_MODEL_diffbir_testr_FT_ctrlnet_and_unetAttn_and_testr_bs3_lr1e-05_SAM100k_STAGE3_RESUME75k_GTprompt_testrPretrained_swinReal_kernelReal_ctrlV21_unetV21/0125000.pt
   ocr_loss_weight: 
-  # save_val_img_dir: /home/cvlab08/projects/data2/jinlovespho/nips2025/benchmarks/SAMText_test_lv1/real_real_v2
-  save_val_img_dir: /home/cvlab08/projects/data2/jinlovespho/nips2025/benchmarks/SAMText_test_lv1/real_real_v2_final
+  save_val_img_dir: /home/cvlab08/projects/data2/jinlovespho/nips2025/benchmarks/SAMText_test_lv1/real_real_v21
   neg_prompt: 
   cfg_scale: 
   initial_prompt: ""
   # initial_prompt: An image containing text in various fonts, sizes, colors, and orientations, embedded naturally or artificially in diverse scenes. The text may appear on signs, billboards, documents, product packaging, or surfaces with varying lighting, backgrounds, and occlusions.
   # initial_prompt: An image containing text in various fonts, sizes, colors, orientations, and styles. 
   use_nullprompt: False
-  use_gtprompt: True
+  use_gtprompt: False
   use_ocrprompt: False
+  use_llavaprompt: True
+  llavaprompt_dir: /home/cvlab08/projects/data2/text_restoration/SAMText_test_degradation/llava_cap/llava_samtext_lv1_prompt.csv
   # when use_gtprompt==True, choose from [CAPTION, TAG]
-  prompt_style: TAG
+  prompt_style: CAPTION
+  split:
 
   
   

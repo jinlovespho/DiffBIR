@@ -153,9 +153,8 @@ exp_args:
   mode: VAL
   # NULLprompt_testrScratch
   # log_additional_msg: realbench_JIHYE_STAGE3_swinReal_kernelReal_ctrlV21_unetV21_OCRprompt0_TAGstyle
-  # log_additional_msg: realbench_PHO_STAGE3_swinReal_kernelReal_ctrlV21_unetV21_OCRprompt0_TAGstyle
-  log_additional_msg: realbench_JIHYE_STAGE3_swinReal_kernelReal_ctrlV21_unetV21_GTrompt_TAGstyle
-  # log_additional_msg: realbench_PHO_STAGE3_swinReal_kernelReal_ctrlV21_unetV21_GTrompt_TAGstyle
+  # log_additional_msg: realbench_JIHYE_STAGE3_swinReal_kernelReal_ctrlV21_unetV21_GTrompt_TAGstyle
+  log_additional_msg: realbench_JIHYE_STAGE3_swinReal_kernelReal_ctrlV21_unetV21_LLAVAprompt
   log_user: pho
   log_server: server8
   log_gpu: gpu0
@@ -174,10 +173,13 @@ exp_args:
   # initial_prompt: An image containing text in various fonts, sizes, colors, and orientations, embedded naturally or artificially in diverse scenes. The text may appear on signs, billboards, documents, product packaging, or surfaces with varying lighting, backgrounds, and occlusions.
   # initial_prompt: An image containing text in various fonts, sizes, colors, orientations, and styles. 
   use_nullprompt: False
-  use_gtprompt: True
+  use_gtprompt: False
   use_ocrprompt: False
+  use_llavaprompt: True
+  llavaprompt_dir: /home/cvlab08/projects/data2/text_restoration/SAMText_test_degradation/llava_cap/llava_realtext_prompt.csv
   # when use_gtprompt==True, choose from [CAPTION, TAG]
   prompt_style: TAG
+  split: 
 
   
   
