@@ -134,6 +134,20 @@ class Diffusion(nn.Module):
             - extract_into_tensor(self.sqrt_one_minus_alphas_cumprod, t, x.shape) * x
         )
 
+    def pred_x_start_from_eps(self, x_t, t, eps):
+        return (
+            x_t
+            - extract_into_tensor(self.sqrt_one_minus_alphas_cumprod, t, x_t.shape) * eps
+        ) / extract_into_tensor(self.sqrt_alphas_cumprod, t, x_t.shape)
+        
+        
+    def pred_x_start_from_v(self, x_t, t, v):
+        return (
+            extract_into_tensor(self.sqrt_alphas_cumprod, t, x_t.shape) * x_t
+            - extract_into_tensor(self.sqrt_one_minus_alphas_cumprod, t, x_t.shape) * v
+        )
+    
+        
     def get_loss(self, pred, target, mean=True):
         if self.loss_type == "l1":
             loss = (target - pred).abs()
@@ -169,7 +183,7 @@ class Diffusion(nn.Module):
         return loss_simple, extracted_feats 
         
 
-    def p_losses(self, model, z_0, t, cond):
+    def p_losses(self, model, z_0, t, cond, cfg=None):
 
         noise = torch.randn_like(z_0)
         z_t = self.q_sample(z_0=z_0, t=t, noise=noise)
@@ -184,7 +198,11 @@ class Diffusion(nn.Module):
         else:
             raise NotImplementedError()
 
-        # pred_z_0 = self.pred_x_start_from_eps(z_t, t, model_output) # obtain pred_x0 from predicted noise
         loss_simple = self.get_loss(model_output, target, mean=False).mean()
+        
+        if cfg.exp_args.vae_decode_ocr:
+            # z_t: b 4 64 64
+            pred_z0 = self.pred_x_start_from_v(z_t, t, model_output) # b 4 64 64 
+            return loss_simple, pred_z0
         
         return loss_simple, extracted_feats 

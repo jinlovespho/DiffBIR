@@ -149,9 +149,13 @@ def main(args):
 
             # sample random training timesteps and obtain diffusion loss
             t = torch.randint(0, diffusion.num_timesteps, (train_bs,), device=device)
-            diff_loss, extracted_feats = diffusion.p_losses(models['cldm'], z_0, t, cond_aug)
+            diff_loss, extracted_feats = diffusion.p_losses(models['cldm'], z_0, t, cond_aug, cfg)
             
-
+            if cfg.exp_args.vae_decode_ocr:
+                pred_z0 = extracted_feats   # b 4 64 64 
+                # pred_x0 = torch.clamp((pure_cldm.vae_decode(pred_z0) + 1) / 2, min=0, max=1)    # b 3 512 512
+                
+                
             # ================================= OCR =================================
             if cfg.exp_args.model_name == 'diffbir_onlybox' or cfg.exp_args.model_name == 'diffbir_testr':
 
@@ -191,7 +195,6 @@ def main(args):
                 ocr_tot_loss=torch.tensor(0).cuda()
 
 
-            
             # calculate gradient and update model
             opt.zero_grad()
             accelerator.backward(total_loss)

@@ -202,7 +202,7 @@ dataset:
 
       final_sinc_prob: 0.8
 
-      p_empty_prompt: 0.0
+      p_empty_prompt: 0.2
 
       data_args: {
         'mode': 'VAL',
@@ -249,7 +249,7 @@ val_batch_transform:
   params:
     use_sharpener: true
     # Queue size of training pool, this should be multiples of batch_size (per GPU).
-    queue_size: 32
+    queue_size: 96
     # the first degradation process
     resize_prob: [0.2, 0.7, 0.1] # up, down, keep
     resize_range: [0.15, 1.5]
@@ -291,17 +291,17 @@ train:
   ckpt_every: 25000
   log_loss_every: 50
   log_image_every: 500
-  batch_size: 3
-  log_num_train_img: 3
-  learning_rate: 1e-5
+  batch_size: 2
+  log_num_train_img: 2
+  learning_rate: 1e-4
   # experiment save directory path
-  exp_dir: ./model_ckpts/sam_cleaned_100k/stage3
+  exp_dir: ./model_ckpts/sam_cleaned_100k/stage2
 
 
 val:
   num_workers: 4
-  batch_size: 2
-  log_num_val_img: 2
+  batch_size: 3
+  log_num_val_img: 3
   log_image_every: 500
 
 
@@ -315,22 +315,21 @@ log_args:
 
 exp_args:
   # NULLprompt_testrScratch
-  log_additional_msg: SAM100k_STAGE3_RESUME75k_GTprompt_testrPretrained_swinReal_kernelReal_ctrlV21_unetV21_DETACH_OCRLoss1.0
+  log_additional_msg: SAM100k_vaedecode_STAGE2_GTprompt_testrPretrained_swinReal_kernelReal_ctrlV21_unetV21_TEST
   log_user: pho
   log_server: server4
-  log_gpu: gpu0
+  log_gpu: gpu1
   # choose from [TRAIN, INFERENCE]
   mode: TRAIN
   # choose from [diffbir, diffbir_testr]
   model_name: diffbir_testr
   testr_ckpt_dir: ./weights/totaltext_testr_R_50_polygon.pth
   # finetuning_method: testr, ctrlnet, ctrlnet_and_testr, ctrlnet_and_unetAttn, ctrlnet_and_unetAttn_and_testr
-  finetuning_method: ctrlnet_and_unetAttn_and_testr
+  finetuning_method: testr
   unet_feat_sampling_timestep: [10,20,30,40,50]
-  # resume_ckpt_dir: ./model_ckpts/sam_cleaned_100k/stage2/pho_server4_gpu1_TRAIN_DATA_sam_clean_MODEL_diffbir_testr_FT_testr_bs3_lr0.0001_SAM100k_STAGE2_GTprompt_testrPretrained_swinReal_kernelReal_ctrlV21_unetV21/0100000.pt
-  resume_ckpt_dir: model_ckpts/sam_cleaned_100k/stage3/pho_server4_gpu2_TRAIN_DATA_sam_clean_MODEL_diffbir_testr_FT_ctrlnet_and_unetAttn_and_testr_bs3_lr1e-05_SAM100k_STAGE3_GTprompt_testrPretrained_swinReal_kernelReal_ctrlV21_unetV21/0075000.pt
+  resume_ckpt_dir: ./model_ckpts/sam_cleaned_100k/stage1/pho_server4_gpu0_TRAIN_DATA_sam_clean_MODEL_diffbir_FT_ctrlnet_and_unetAttn_bs3_lr0.0001_SAM100k_STAGE1_GTprompt_swinReal_kernelReal_ctrlV21_unetV21/0100000.pt
   ocr_loss_weight: 1.0
-  vae_decode_ocr:
+  vae_decode_ocr: True
 
   
   
