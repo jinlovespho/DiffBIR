@@ -1,1 +1,0 @@
-CUDA_VISIBLE_DEVICES=2 accelerate launch train.py --config configs/train/train_diffbir_baseline.yaml

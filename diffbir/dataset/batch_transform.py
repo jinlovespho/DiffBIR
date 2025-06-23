@@ -143,6 +143,7 @@ class RealESRGANBatchTransform(BatchTransform):
     def __call__(
         self, batch: Dict[str, Union[torch.Tensor, str]]
     ) -> Dict[str, Union[torch.Tensor, List[str]]]:
+        
         # training data synthesis
         hq = batch["hq"]
         if self.use_sharpener:
@@ -154,7 +155,7 @@ class RealESRGANBatchTransform(BatchTransform):
         kernel2 = batch["kernel2"]
         sinc_kernel = batch["sinc_kernel"]
 
-        ori_h, ori_w = hq.size()[2:4]
+        ori_h, ori_w = hq.size()[2:4]       # 512 512
 
         # ----------------------- The first degradation process ----------------------- #
         # blur
@@ -272,14 +273,15 @@ class RealESRGANBatchTransform(BatchTransform):
 
         self.gt = hq
         self.lq = lq
-        self.txt = batch["txt"]
-        self._dequeue_and_enqueue()
+        self.txt = batch["prompt"]
+        # self._dequeue_and_enqueue()
 
         # [0, 1], float32, rgb, nhwc
         lq = self.lq.float().permute(0, 2, 3, 1).contiguous()
         # [-1, 1], float32, rgb, nhwc
         hq = (self.gt * 2 - 1).float().permute(0, 2, 3, 1).contiguous()
         txt = self.txt
-
+        
         # return dict(jpg=hq, hint=lq, txt=batch["txt"])
+        return hq, lq, txt, batch['text'], batch['bbox'], batch['poly'], batch['text_enc'], batch['img_name']
         return hq, lq, txt

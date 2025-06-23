@@ -93,34 +93,15 @@ model:
       zero_snr: True
       parameterization: v
 
-#   # diffusion pipeline config
-#   diffusion:
-#     target: diffbir.model.gaussian_diffusion.Diffusion
-#     params:
-#       linear_start: 0.00085
-#       linear_end: 0.0120
-#       timesteps: 1000
-#       zero_snr: False
-#       parameterization: eps
-
 
 dataset:
   dataset_type: realsr
 
   train:
-    target: diffbir.dataset.pho_realesrgan.RealESRGANDataset
+    target: diffbir.dataset.realesrgan.RealESRGANDataset
     params:
-      file_list: /media/dataset2/text_restoration/100K
-      # # Path to the file list.
-      # file_metas:
-      #   # The training set is formatted as a parquet file.
-      #   # Each row contains file path, long caption and short caption of a high-quality image.
-      #   - file_list: 
-      #     image_path_key: image_path
-      #     short_prompt_key: llava_short
-      #     long_prompt_key: llava_long
-
-      # p_long_prompt: 0.2
+      # file_list: /media/dataset2/text_restoration/100K_oldest
+      file_list: /media/dataset2/text_restoration/tair_published/sa_text
       file_backend_cfg:
         target: diffbir.dataset.file_backend.HardDiskBackend
 
@@ -153,28 +134,20 @@ dataset:
       data_args: {
         'mode': 'TRAIN',
         'datasets':['sam_clean'], 
-        'ann_path':'/media/dataset2/text_restoration/100K/combined_restoration_dataset.json',
+        # 'ann_path':'/media/dataset2/text_restoration/100K_oldest/combined_restoration_dataset.json',
+        'ann_path':'/media/dataset2/text_restoration/tair_published/sa_text/restoration_dataset.json',
         # xywh_unscaled, xyxy_scaled, cxcywh_scaled
         'bbox_format': 'cxcywh_scaled', 
         'model_img_size': [512, 512],
-        'use_gtprompt': False,
+        'use_gtprompt': True,
         }
 
   # validation data confid
   val:
-    target: diffbir.dataset.pho_realesrgan.RealESRGANDataset
+    target: diffbir.dataset.realesrgan.RealESRGANDataset
     params:
-      file_list: /media/dataset2/text_restoration/100K
-      # # Path to the file list.
-      # file_metas:
-      #   # The training set is formatted as a parquet file.
-      #   # Each row contains file path, long caption and short caption of a high-quality image.
-      #   - file_list: 
-      #     image_path_key: image_path
-      #     short_prompt_key: llava_short
-      #     long_prompt_key: llava_long
-
-      # p_long_prompt: 0.2
+      # file_list: /media/dataset2/text_restoration/100K_oldest
+      file_list: /media/dataset2/text_restoration/tair_published/sa_text
       file_backend_cfg:
         target: diffbir.dataset.file_backend.HardDiskBackend
 
@@ -202,22 +175,23 @@ dataset:
 
       final_sinc_prob: 0.8
 
-      p_empty_prompt: 0.2
+      p_empty_prompt: 0.0
 
       data_args: {
         'mode': 'VAL',
         'datasets':['sam_clean'], 
-        'ann_path':'/media/dataset2/text_restoration/100K/combined_restoration_dataset.json',
+        # 'ann_path':'/media/dataset2/text_restoration/100K_oldest/combined_restoration_dataset.json',
+        'ann_path':'/media/dataset2/text_restoration/tair_published/sa_text/restoration_dataset.json',
         # xywh_unscaled, xyxy_scaled, cxcywh_scaled
         'bbox_format': 'cxcywh_scaled', 
         'model_img_size': [512, 512],
-        'use_gtprompt': False,
+        'use_gtprompt': True,
         }
 
 
 
 train_batch_transform:
-  target: diffbir.dataset.pho_batch_transform.RealESRGANBatchTransform
+  target: diffbir.dataset.batch_transform.RealESRGANBatchTransform
   params:
     use_sharpener: true
     # Queue size of training pool, this should be multiples of batch_size (per GPU).
@@ -245,11 +219,11 @@ train_batch_transform:
 
 
 val_batch_transform:
-  target: diffbir.dataset.pho_batch_transform.RealESRGANBatchTransform
+  target: diffbir.dataset.batch_transform.RealESRGANBatchTransform
   params:
     use_sharpener: true
     # Queue size of training pool, this should be multiples of batch_size (per GPU).
-    queue_size: 96
+    queue_size: 32
     # the first degradation process
     resize_prob: [0.2, 0.7, 0.1] # up, down, keep
     resize_range: [0.15, 1.5]
@@ -274,16 +248,8 @@ val_batch_transform:
 
 # training args
 train:
-  # pretrained sd v2.1 path
-  # sd_path: ./weights/v2-1_512-ema-pruned.ckpt           -> unetV2
-  # sd_path: ./weights/sd2.1-base-zsnr-laionaes5.ckpt     -> unetV21
   sd_path: ./weights/sd2.1-base-zsnr-laionaes5.ckpt       
-  # stage 1 swinir path.
-  # swinir_path: ./weights/codeformer_swinir.ckpt         -> swinCode
-  # swinir_path: ./weights/realesrgan_s4_swinir_100k.pth  -> swinReal
   swinir_path: ./weights/realesrgan_s4_swinir_100k.pth
-  # resume: ./weights/v2.pth                              -> ctrlV2
-  # resume: ./weights/DiffBIR_v2.1.pt                     -> ctrlV21
   resume: ./weights/DiffBIR_v2.1.pt
   noise_aug_timestep: 0
   num_workers: 4
@@ -291,17 +257,17 @@ train:
   ckpt_every: 25000
   log_loss_every: 50
   log_image_every: 500
-  batch_size: 3
-  log_num_train_img: 3
-  learning_rate: 1e-4
+  batch_size: 2
+  log_num_train_img: 2
+  learning_rate: 1e-5
   # experiment save directory path
-  exp_dir: ./model_ckpts/sam_cleaned_100k/stage1
+  exp_dir: ./model_ckpts/sam_cleaned_100k/stage3
 
 
 val:
   num_workers: 4
-  batch_size: 3
-  log_num_val_img: 3
+  batch_size: 2
+  log_num_val_img: 2
   log_image_every: 500
 
 
@@ -314,25 +280,19 @@ log_args:
 
 
 exp_args:
-  # NULLprompt_testrScratch
-  log_additional_msg: SAM100k_STAGE1_NULLprompt_swinReal_kernelReal_ctrlV21_unetV21
-  log_user: pho
-  log_server: server4
-  log_gpu: gpu0
-  # choose from [TRAIN, INFERENCE]
-  mode: TRAIN
-  # choose from [diffbir, diffbir_testr]
-  model_name: diffbir
-  testr_ckpt_dir:
-  # finetuning_method: testr, ctrlnet, ctrlnet_and_testr, ctrlnet_and_unetAttn, ctrlnet_and_unetAttn_and_testr
-  finetuning_method: ctrlnet
+  log_additional_msg: TRAIN_STAGE3
+  mode: TRAIN                 # choose from [TRAIN, INFERENCE]
+  model_name: diffbir_testr   # choose from [diffbir, diffbir_testr]
+  testr_ckpt_dir: ./weights/totaltext_testr_R_50_polygon.pth
+  finetuning_method: ctrlnet_and_unetAttn_and_testr   # choose from [ctrlnet_and_unetAttn, testr, ctrlnet_and_unetAttn_and_testr]
   unet_feat_sampling_timestep: [10,20,30,40,50]
-  resume_ckpt_dir:
-  ocr_loss_weight: 0.0
+  # resume_ckpt_dir: ./model_ckpts/sam_cleaned_100k/stage2/pho_server4_gpu1_TRAIN_DATA_sam_clean_MODEL_diffbir_testr_FT_testr_bs3_lr0.0001_SAM100k_STAGE2_GTprompt_testrPretrained_swinReal_kernelReal_ctrlV21_unetV21/0100000.pt
+  resume_ckpt_dir: /media/dataset2/jinlovespho/nips2025/DiffBIR/model_ckpts/sam_cleaned_100k/stage3/pho_server4_gpu2_TRAIN_DATA_sam_clean_MODEL_diffbir_testr_FT_ctrlnet_and_unetAttn_and_testr_bs3_lr1e-05_SAM100k_STAGE3_GTprompt_testrPretrained_swinReal_kernelReal_ctrlV21_unetV21/0075000.pt
+  ocr_loss_weight: 0.01
+
 
   
   
   
-
   
   

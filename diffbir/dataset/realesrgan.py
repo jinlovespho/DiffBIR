@@ -10,16 +10,18 @@ from torch.utils import data
 from PIL import Image
 
 from .degradation import circular_lowpass_kernel, random_mixed_kernels
-from .utils import augment, random_crop_arr, center_crop_arr, load_file_metas
+# from .utils import augment, random_crop_arr, center_crop_arr, load_file_metas
 from ..utils.common import instantiate_from_config
+from .utils import load_file_list, center_crop_arr, random_crop_arr, augment
 
 
 class RealESRGANDataset(data.Dataset):
 
     def __init__(
         self,
-        file_metas: List[Dict[str, str]],
-        p_long_prompt: float,
+        file_list: str,
+        # file_metas: List[Dict[str, str]],
+        # p_long_prompt: float,
         file_backend_cfg: Mapping[str, Any],
         out_size: int,
         crop_type: str,
@@ -43,14 +45,16 @@ class RealESRGANDataset(data.Dataset):
         sinc_prob2: float,
         final_sinc_prob: float,
         p_empty_prompt: float,
+        data_args=None
     ) -> "RealESRGANDataset":
         super(RealESRGANDataset, self).__init__()
-        self.file_metas = file_metas
-        self.image_files = load_file_metas(file_metas)
-        self.p_long_prompt = p_long_prompt
-        assert (
-            0 <= p_long_prompt <= 1
-        ), f"p_long_prompt {p_long_prompt} should be a probability between [0, 1]"
+        
+        # JLP
+        self.data_args = data_args 
+        
+        self.file_list = file_list
+        self.image_files = load_file_list(file_list, data_args)
+        
         self.file_backend = instantiate_from_config(file_backend_cfg)
         self.out_size = out_size
         self.crop_type = crop_type
@@ -86,7 +90,7 @@ class RealESRGANDataset(data.Dataset):
         self.pulse_tensor[10, 10] = 1
 
         self.p_empty_prompt = p_empty_prompt
-
+        
     def load_gt_image(
         self, image_path: str, max_retry: int = 5
     ) -> Optional[np.ndarray]:
@@ -132,11 +136,13 @@ class RealESRGANDataset(data.Dataset):
             # load meta file
             image_file = self.image_files[index]
             gt_path = image_file["image_path"]
-            p = np.random.uniform()
-            if p < self.p_long_prompt:
-                prompt = image_file["long_prompt"]
-            else:
-                prompt = image_file["short_prompt"]
+            prompt = image_file["prompt"]
+            text = image_file["text"]
+            bbox = image_file["bbox"]
+            text_enc = image_file["text_enc"]
+            img_name = image_file['img_name']
+            poly = image_file.get('poly')
+            
             img_gt = self.load_gt_image(gt_path)
             if img_gt is None:
                 print(f"failed to load {gt_path}, try another image")
@@ -213,7 +219,20 @@ class RealESRGANDataset(data.Dataset):
         img_hq = torch.from_numpy(img_hq[..., ::-1].transpose(2, 0, 1).copy()).float()
         kernel = torch.FloatTensor(kernel)
         kernel2 = torch.FloatTensor(kernel2)
-
+        
+        return img_hq, kernel, kernel2, sinc_kernel, prompt, text, bbox, poly, text_enc, img_name 
+        return {
+            "hq": img_hq,
+            "kernel1": kernel,
+            "kernel2": kernel2,
+            "sinc_kernel": sinc_kernel,
+            "prompt": prompt,
+            'text': text,
+            'bbox': bbox,
+            'poly': poly,
+            'text_enc': text_enc,
+            'img_name': img_name
+        }
         return {
             "hq": img_hq,
             "kernel1": kernel,
@@ -224,3 +243,41 @@ class RealESRGANDataset(data.Dataset):
 
     def __len__(self) -> int:
         return len(self.image_files)
+
+
+
+def collate_fn_real(batch):
+
+    gt, kernel, kernel2, sinc_kernel, prompt, text, bbox, poly, text_enc, img_name  = zip(*batch)
+
+    # Convert lists of tensors to stacked tensors safely
+    gt = torch.stack([x.clone().detach() for x in gt])
+    # lq = torch.stack([x.clone().detach() for x in lq])
+    kernel = torch.stack([x.clone().detach() for x in kernel])
+    kernel2 = torch.stack([x.clone().detach() for x in kernel2])
+    sinc_kernel = torch.stack([x.clone().detach() for x in sinc_kernel])
+
+    
+    text_enc_tensor=[]
+    # preprocess text_enc
+    for i in range(len(text_enc)):
+        text_enc_tensor.append(torch.tensor(text_enc[i], dtype=torch.int32))
+
+
+    poly_tensor=[]
+    # process poly
+    for i in range(len(poly)):
+        poly_tensor.append(torch.tensor(np.array(poly[i]), dtype=torch.float32))
+    
+    return {
+            "hq": gt,                           # b 3 512 512 
+            "kernel1": kernel,                  # len(kernel)=b, kernel[0].shape: 21 21
+            "kernel2": kernel2,
+            "sinc_kernel": sinc_kernel,
+            "prompt": list(prompt),
+            'text': list(text),
+            'bbox': list(bbox),
+            'poly': list(poly_tensor),
+            'text_enc': list(text_enc_tensor),
+            'img_name': list(img_name)
+        }

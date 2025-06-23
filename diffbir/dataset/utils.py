@@ -12,36 +12,170 @@ from torch.nn import functional as F
 
 from .diffjpeg import DiffJPEG
 
+import json 
+import string
 
-def load_file_list(file_list_path: str) -> List[Dict[str, str]]:
+
+# unicode conversion: char <-> int
+# use chr() and ord()
+# char_table = [chr(i) for i in range(32,127)]
+# valid_voc = list(string.printable[:-6])
+# invalid_voc=['□', '∫', 'æ', '⬏', 'Σ', '■', 'Å', 'Ḏ', '£', 'ń', '⌀', 'Ù', '│', 'Ⅶ', 'Â', 'ς', 'Ⅻ', '⁴', 'ъ', '∁', 'Æ', 'α', 'Ç', 'ˣ', '・', '⤤', 'Đ', 'ı', '≡', '⋄', 'Å', 'ᴴ', 'ᵗ', 'Ȃ', 'δ', 'Ì', 'Ρ', '⟷', 'ï', '«', 'ȯ', 'Ǒ', '⇩', 'ζ', '✰', '⁹', 'м', 'Ộ', '❘', '₄', '²', 'φ', '⌴', '⇨', 'ƌ', 'σ', 'Ⅸ', '∞', 'ţ', 'ů', '◁', '½', '¾', 'ᴾ', '�', 'ê', 'Ⅵ', 'ˢ', '°', 'ɮ', '⇪', 'ᵈ', 'Ė', 'Ǐ', '⊲', '·', 'û', '˅', '⊤', '↰', 'Ī', 'ȍ', '×', '⊝', '‟', '√', '➀', 'î', '↹', '➞', '↑', 'ü', '⋏', '℃', 'Û', 'Ȅ', '›', '⟶', '○', 'Ⓡ', 'Ȋ', '➜', 'ᴺ', 'å', '►', '˂', 'ι', 'ā', 'Ś', '∇', '•', '¥', '★', '⋅', 'ₖ', 'ũ', '⁼', 'İ', '∓', '⊂', '➯', '₅', 'Ồ', '»', 'Ž', 'ì', 'Ⅴ', '„', 'Ň', 'ú', '‑', 'Ä', '⊣', '˄', '˙', 'Ó', '±', '╳', 'ⁿ', 'ū', 'ş', 'л', 'Ṡ', 'ᴵ', 'Ȏ', 'ñ', 'λ', '✓', 'ø', '✞', '≤', 'Õ', '⎯', '⬌', 'ʳ', 'Š', '◉', '➨', 'ᶜ', 'ź', 'ġ', 'ÿ', '◦', 'ḻ', '➮', 'ᴸ', 'Ú', '─', '⇧', '⤶', 'ð', 'ë', 'Ξ', 'ȑ', '⇦', '↻', 'ă', 'Ě', 'Ω', 'Á', '₃', 'к', 'Ⅰ', '▬', '—', '∈', 'Ạ', '☐', '⁸', 'Ŕ', 'ù', 'â', 'п', 'ᴭ', '÷', '↲', '‘', 'Ȇ', 'ᵀ', '¿', 'Ț', '▎', 'ě', 'ⱽ', 'Λ', '∷', '△', 'ç', 'ǫ', 'Ầ', '➩', 'и', 'Ū', 'ý', '―', '⇵', 'Í', 'ꝋ', '↓', '©', '³', 'Ɔ', 'è', '🠈', 'ğ', 'Ⓐ', 'я', 'Φ', 'Ấ', 'ᵖ', '︽', '˚', 'œ', '∥', 'β', 'й', 'Ⓒ', '⬍', '∨', '℮', '¼', 'ć', '␣', 'Ã', '🡨', 'Ą', 'ǵ', '™', 'Ế', 'ᵐ', '◄', 'Ń', '✱', 'ô', '¢', '₁', 'Ⅱ', '¹', 'π', 'µ', 'Ĺ', '⍙', 'р', 'Ï', 'ε', '⟵', '∆', 'ы', '⧫', 'ã', 'ė', '⁰', '⬉', '−', '⬋', '◯', 'о', 'À', 'ρ', '☰', 'τ', 'ŗ', '⸬', 'Ö', 'é', 'ə', 'Ǫ', 'Ē', '⎵', '𝔀', 'ⓒ', 'ȏ', '“', 'Č', 'č', 'Î', '∙', 'ṣ', '\u200b', '✚', 'ō', '”', 'ö', 'ᴹ', '▢', 'ν', '⌣', '：', '︾', '﹘', 'а', '∖', '⌄', 'в', '︿', 'ᵃ', 'ớ', '↺', '▲', '▽', '…', 'Ë', '⌫', '⤷', '€', '⊘', 'Ŏ', '₂', '⤺', '⁵', 'Ȧ', '∧', 'ω', '卐', 'Ⅳ', '⁻', '↵', 'ĩ', 'Ⅲ', 'Ă', '⬸', 'ʃ', 'ȇ', '←', '⅓', '⮌', '⇥', 'η', '➦', 'Ô', '⬊', '℉', '⊥', 'á', 'ŉ', '⊚', '–', 'Ā', '∅', 'Ć', '∎', '⤸', '⦁', 'ē', 'ί', 'õ', 'ᴱ', 'υ', 'ß', '◡', 'È', '∣', 'Δ', 'ᴙ', 'ò', '⊢', 'κ', '☓', 'Ề', 'Θ', 'ä', '﹀', '☆', 'Ò', '˃', 'à', 'Ê', 'ʰ', 'Ğ', '’', '→', '®', '●', '⁺', 'Ţ', 'Ż', '̓', '▼', 'Ể', 'ᵒ', 'Ý', 'б', '➔', 'г', '∴', '⅔', '⬈', 'Ō', '∊', 'Π', 'Ⅷ', 'Ñ', '➝', 'É', 'Ł', 'ó', '∉', 'Ø', 'Ü', '⋮', 'ĺ', '≣', '∼', '↱', 'í', 'Ⅹ', 'ę', '⋯', 'с', '╎', '⤦', '⊼', 'ȧ', '∝', '⤻', 'ξ', 'š', '▾', 'γ', '¡', '⊳', 'д', '⁷', 'ж', '➧', 'ᴰ', '‧', '∘', 'ž', 'Ȯ', 'Ⅺ']
+CTLABELS = [' ','!','"','#','$','%','&','\'','(',')','*','+',',','-','.','/','0','1','2','3','4','5','6','7','8','9',':',';','<','=','>','?','@','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z','[','\\',']','^','_','`','a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z','{','|','}','~']
+
+def decode(idxs):
+    s = ''
+    for idx in idxs:
+        if idx < len(CTLABELS):
+            s += CTLABELS[idx]
+        else:
+            return s
+    return s
+
+
+def encode(word):
+    s = []
+    max_word_len = 25
+    for i in range(max_word_len):
+        if i < len(word):
+            char=word[i]
+            idx = CTLABELS.index(char)
+            s.append(idx)
+        else:
+            s.append(96)
+    return s
+
+
+def load_file_list(file_list_path: str, data_args=None):
+
+    mode = data_args['mode']
+    datasets = data_args['datasets']
+    ann_path = data_args['ann_path']
+    use_gtprompt = data_args['use_gtprompt']
+    model_H, model_W = data_args['model_img_size']
+
     files = []
-    breakpoint()
-    with open(file_list_path, "r") as fin:
-        for line in fin:
-            path = line.strip()
-            if path:
-                files.append({"image_path": path, "prompt": ""})
-    return files
+    for dataset in datasets:
+
+        if dataset == 'sam_clean':
+            
+            # load json 
+            json_path = ann_path 
+            with open(json_path, 'r') as f:
+                json_data = json.load(f)
+                json_data = sorted(json_data.items())
+            
+
+            # split train and val ratio 10:1
+            split_index = int(len(json_data) * 10 / 11)
+            if mode == 'TRAIN':
+                json_data = dict(json_data[:split_index])
+            elif mode == 'VAL':
+                json_data = dict(json_data[split_index:])
 
 
-def load_file_metas(file_metas: List[Dict[str, str]]) -> List[Dict[str, str]]:
-    files = []
-    for file_meta in file_metas:
-        file_list_path = file_meta["file_list"]
-        image_path_key = file_meta["image_path_key"]
-        short_prompt_key = file_meta["short_prompt_key"]
-        long_prompt_key = file_meta["long_prompt_key"]
-        ext = os.path.splitext(file_list_path)[1].lower()
-        assert ext == ".parquet", f"only support parquet format"
-        df = pl.read_parquet(file_list_path)
-        for row in df.iter_rows(named=True):
-            files.append(
-                {
-                    "image_path": row[image_path_key],
-                    "short_prompt": row[short_prompt_key],
-                    "long_prompt": row[long_prompt_key],
-                }
-            )
+            # image path 
+            imgs_path = f'{file_list_path}/images'
+            imgs = sorted(os.listdir(imgs_path))
+
+
+            for img in imgs:
+                gt_path = f'{imgs_path}/{img}'
+
+                img_id = img.split('.')[0]
+                if img_id in json_data.keys():
+                    img_ann = json_data[img_id]['0']['text_instances']
+                else:
+                    continue
+
+
+                boxes=[]
+                texts=[]
+                text_encs=[]
+                polys=[]
+
+                for ann in img_ann:
+
+                    # process text 
+                    text = ann['text']
+                    count=0
+                    for char in text:
+                        # only allow OCR english vocab: range(32,127)
+                        if 32 <= ord(char) and ord(char) < 127:
+                            count+=1
+                            # print(char, ord(char))
+                    if count == len(text) and count < 26:
+                        texts.append(text)
+                        text_encs.append(encode(text))
+                        assert text == decode(encode(text)), 'check text encoding !'
+                    else:
+                        continue
+
+
+                    # process box
+                    box_xyxy = ann['bbox']
+                    x1,y1,x2,y2 = box_xyxy
+                    box_xywh = [ x1, y1, x2-x1, y2-y1 ]
+                    box_xyxy_scaled = list(map(lambda x: x/model_H, box_xyxy))  # scale box coord to [0,1]
+                    x1,y1,x2,y2 = box_xyxy_scaled 
+                    box_cxcywh = [(x1+x2)/2, (y1+y2)/2, x2-x1, y2-y1]   # xyxy -> cxcywh
+                    # select box format
+                    if data_args['bbox_format'] == 'xywh_unscaled':
+                        processed_box = box_xywh
+                        processed_box = list(map(lambda x: int(x), processed_box))
+                    elif data_args['bbox_format'] == 'xyxy_scaled':
+                        processed_box = box_xyxy_scaled
+                        processed_box = list(map(lambda x: round(x,4), processed_box))
+                    elif data_args['bbox_format'] == 'cxcywh_scaled':
+                        processed_box = box_cxcywh
+                        processed_box = list(map(lambda x: round(x,4), processed_box))
+                    boxes.append(processed_box)
+
+
+                    # process polygons
+                    poly = np.array(ann['polygon']).astype(np.int32)    # 16 2
+                    # scale poly
+                    poly_scaled = poly / np.array([model_W, model_H])
+                    polys.append(poly_scaled)
+
+
+                    # # VISUALIZE FOR DEBUGGING
+                    # img0 = cv2.imread(gt_path)  # 512 512 3
+                    # x,y,w,h = box_xywh
+                    # cv2.rectangle(img0_box, (x,y), (x+w, y+h), (0,255,0), 2)
+                    # cv2.polylines(img0_poly, [poly], True, (0,255,0), 2)
+                    # cv2.putText(img0_box, text, (poly[0][0], poly[0][1]-5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
+                    # cv2.putText(img0_poly, text, (poly[0][0], poly[0][1]-5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
+                    # cv2.imwrite('./img0_box.jpg', img0_box)
+                    # cv2.imwrite('./img0_poly.jpg', img0_poly)
+
+                assert len(boxes) == len(texts) == len(text_encs) == len(polys), f" Check loader!"
+
+                # if the filetered image has no bbox and texts, skip it
+                if len(boxes) == 0 or len(polys) == 0:
+                    continue
+
+                # process prompt
+                if use_gtprompt:
+                    caption = [f'"{txt}"' for txt in texts]
+                    # prompt = f"A high-quality photo containing the word {', '.join(caption) }."
+                    prompt = f"A realistic scene where the texts {', '.join(caption) } appear clearly on signs, boards, buildings, or other objects."
+                else:
+                    prompt=""
+
+
+                files.append({"image_path": gt_path, 
+                              "prompt": prompt, 
+                              "text": texts, 
+                              "bbox": boxes,
+                              'poly': polys,
+                              'text_enc': text_encs, 
+                              "img_name": img_id})     
+    
+
+    if mode=='VAL':
+        files = random.sample(files, 10)
+
     return files
 
 

@@ -51,7 +51,6 @@ class ControlledUnetModel(UNetModel):
             h = module(h, emb, context)
             # JLP - extract feat
             if i in extract_idx:
-                # extracted_feats.append(h.detach())
                 extracted_feats.append(h)
 
         h = h.type(x.dtype)

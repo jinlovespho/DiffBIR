@@ -200,9 +200,4 @@ class Diffusion(nn.Module):
 
         loss_simple = self.get_loss(model_output, target, mean=False).mean()
         
-        if cfg.exp_args.vae_decode_ocr:
-            # z_t: b 4 64 64
-            pred_z0 = self.pred_x_start_from_v(z_t, t, model_output) # b 4 64 64 
-            return loss_simple, pred_z0
-        
         return loss_simple, extracted_feats 

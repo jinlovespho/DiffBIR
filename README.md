@@ -118,11 +118,17 @@ pip install -e .
 ```
 
 #### 4. Download pretrained weights
+1. First download pretrained weights by running the following bash file.
 ```
 bash download_weights.sh
 ```
+2. Additionally, download the pretrained text spotting module's weight from this [link](https://ucsdcloud-my.sharepoint.com/personal/xiz102_ucsd_edu/_layouts/15/onedrive.aspx?id=%2Fpersonal%2Fxiz102%5Fucsd%5Fedu%2FDocuments%2Fpublish%2Fcvpr22%5Ftestr%2Fweights%2Ftotaltext%5Ftestr%5FR%5F50%5Fpolygon%2Epth&parent=%2Fpersonal%2Fxiz102%5Fucsd%5Fedu%2FDocuments%2Fpublish%2Fcvpr22%5Ftestr%2Fweights&ga=1) and place it inside **./weights** folder.
+
+
 
 #### 5. Download dataset
+
+
 
 
 ## 🔧 Training 
@@ -132,32 +138,32 @@ Training is conducted in three stages:
 - **Stage 2**: Train only the text spotting module.
 - **Stage 3**: Jointly train both modules.
 ---
-<!-- The training configuration file is located in **configs/train**.  -->
+
 ### Stage1 Training Script
-Stage1 training configuration file can be found [here](configs/train/train_diffbir_sam_cleaned_100k_ours_stage1_swinReal_kernelReal_ctrlV21_unetV21.yaml)
+Run the following bash script for **Stage1** training. Its configuration file can be found [here](configs/train/train_stage1_terediff.yaml)
 
 ```
-bash run_script/train_script/run_train_diffbir_sam_cleaned_100k_ours_stage1_swinReal_kernelReal_ctrlV21_unetV21.sh
+bash run_script/train_script/run_train_stage1_terediff.sh
 ```
 
 ### Stage2 Training Script
-Stage2 training configuration file can be found [here](configs/train/train_diffbir_sam_cleaned_100k_ours_stage2_swinReal_kernelReal_ctrlV21_unetV21.yaml)
+Run the following bash script for **Stage2** training. Its configuration file can be found [here](configs/train/train_stage2_terediff.yaml)
 
 ```
-bash run_script/train_script/run_train_diffbir_sam_cleaned_100k_ours_stage2_swinReal_kernelReal_ctrlV21_unetV21.sh
+bash run_script/train_script/run_train_stage2_terediff.sh
 ```
 
 ### Stage3 Training Script
-Stage3 training configuration file can be found [here](configs/train/train_diffbir_sam_cleaned_100k_ours_stage3_swinReal_kernelReal_ctrlV21_unetV21.yaml)
+Run the following bash script for **Stage3** training. Its configuration file can be found [here](configs/train/train_stage3_terediff.yaml)
 
 ```
-bash run_script/train_script/run_train_diffbir_sam_cleaned_100k_ours_stage3_swinReal_kernelReal_ctrlV21_unetV21.sh
+bash run_script/train_script/run_train_stage3_terediff.sh
 ```
 
 
 ## 🚀 Inference 
+The following scripts can be used for inferencing on low-quality images to obtain high-quality text-aware restored images.
 
----
 ### Evaluation on SA-Text (Lv1) 
 ```
 

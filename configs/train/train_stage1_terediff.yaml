@@ -93,40 +93,19 @@ model:
       zero_snr: True
       parameterization: v
 
-#   # diffusion pipeline config
-#   diffusion:
-#     target: diffbir.model.gaussian_diffusion.Diffusion
-#     params:
-#       linear_start: 0.00085
-#       linear_end: 0.0120
-#       timesteps: 1000
-#       zero_snr: False
-#       parameterization: eps
-
 
 dataset:
   dataset_type: realsr
 
   train:
-    target: diffbir.dataset.pho_realesrgan.RealESRGANDataset
+    target: diffbir.dataset.realesrgan.RealESRGANDataset
     params:
-      file_list: /media/dataset2/text_restoration/100K
-      # # Path to the file list.
-      # file_metas:
-      #   # The training set is formatted as a parquet file.
-      #   # Each row contains file path, long caption and short caption of a high-quality image.
-      #   - file_list: 
-      #     image_path_key: image_path
-      #     short_prompt_key: llava_short
-      #     long_prompt_key: llava_long
-
-      # p_long_prompt: 0.2
+      # file_list: /media/dataset2/text_restoration/100K_oldest
+      file_list: /media/dataset2/text_restoration/tair_published/sa_text
       file_backend_cfg:
         target: diffbir.dataset.file_backend.HardDiskBackend
-
       out_size: 512
       crop_type: none
-
       use_hflip: false
       use_rot: false
 
@@ -147,40 +126,28 @@ dataset:
       betap_range2: [1, 2]
 
       final_sinc_prob: 0.8
-
       p_empty_prompt: 0.2
 
       data_args: {
         'mode': 'TRAIN',
         'datasets':['sam_clean'], 
-        'ann_path':'/media/dataset2/text_restoration/100K/combined_restoration_dataset.json',
+        'ann_path':'/media/dataset2/text_restoration/tair_published/sa_text/restoration_dataset.json',
         # xywh_unscaled, xyxy_scaled, cxcywh_scaled
         'bbox_format': 'cxcywh_scaled', 
         'model_img_size': [512, 512],
         'use_gtprompt': True,
         }
 
-  # validation data confid
+  # validation data config
   val:
-    target: diffbir.dataset.pho_realesrgan.RealESRGANDataset
+    target: diffbir.dataset.realesrgan.RealESRGANDataset
     params:
-      file_list: /media/dataset2/text_restoration/100K
-      # # Path to the file list.
-      # file_metas:
-      #   # The training set is formatted as a parquet file.
-      #   # Each row contains file path, long caption and short caption of a high-quality image.
-      #   - file_list: 
-      #     image_path_key: image_path
-      #     short_prompt_key: llava_short
-      #     long_prompt_key: llava_long
-
-      # p_long_prompt: 0.2
+      # file_list: /media/dataset2/text_restoration/100K_oldest
+      file_list: /media/dataset2/text_restoration/tair_published/sa_text
       file_backend_cfg:
         target: diffbir.dataset.file_backend.HardDiskBackend
-
       out_size: 512
       crop_type: none
-
       use_hflip: false
       use_rot: false
 
@@ -201,13 +168,12 @@ dataset:
       betap_range2: [1, 2]
 
       final_sinc_prob: 0.8
-
       p_empty_prompt: 0.2
 
       data_args: {
         'mode': 'VAL',
         'datasets':['sam_clean'], 
-        'ann_path':'/media/dataset2/text_restoration/100K/combined_restoration_dataset.json',
+        'ann_path':'/media/dataset2/text_restoration/tair_published/sa_text/restoration_dataset.json',
         # xywh_unscaled, xyxy_scaled, cxcywh_scaled
         'bbox_format': 'cxcywh_scaled', 
         'model_img_size': [512, 512],
@@ -217,7 +183,7 @@ dataset:
 
 
 train_batch_transform:
-  target: diffbir.dataset.pho_batch_transform.RealESRGANBatchTransform
+  target: diffbir.dataset.batch_transform.RealESRGANBatchTransform
   params:
     use_sharpener: true
     # Queue size of training pool, this should be multiples of batch_size (per GPU).
@@ -245,7 +211,7 @@ train_batch_transform:
 
 
 val_batch_transform:
-  target: diffbir.dataset.pho_batch_transform.RealESRGANBatchTransform
+  target: diffbir.dataset.batch_transform.RealESRGANBatchTransform
   params:
     use_sharpener: true
     # Queue size of training pool, this should be multiples of batch_size (per GPU).
@@ -275,15 +241,8 @@ val_batch_transform:
 # training args
 train:
   # pretrained sd v2.1 path
-  # sd_path: ./weights/v2-1_512-ema-pruned.ckpt           -> unetV2
-  # sd_path: ./weights/sd2.1-base-zsnr-laionaes5.ckpt     -> unetV21
   sd_path: ./weights/sd2.1-base-zsnr-laionaes5.ckpt       
-  # stage 1 swinir path.
-  # swinir_path: ./weights/codeformer_swinir.ckpt         -> swinCode
-  # swinir_path: ./weights/realesrgan_s4_swinir_100k.pth  -> swinReal
   swinir_path: ./weights/realesrgan_s4_swinir_100k.pth
-  # resume: ./weights/v2.pth                              -> ctrlV2
-  # resume: ./weights/DiffBIR_v2.1.pt                     -> ctrlV21
   resume: ./weights/DiffBIR_v2.1.pt
   noise_aug_timestep: 0
   num_workers: 4
@@ -305,27 +264,24 @@ val:
   log_image_every: 500
 
 
-
 log_args:
   log_tool: wandb
   wandb_key: e32eed0c2509bf898b850b0065ab62345005fb73
   wandb_proj_name: DiffBIR_OCR_finetuning
 
+# log_args:
+#   log_tool: 
+#   wandb_key: 
+#   wandb_proj_name: 
+
 
 
 exp_args:
-  # NULLprompt_testrScratch
-  log_additional_msg: SAM100k_STAGE1_GTprompt_swinReal_kernelReal_ctrlV21_unetV21
-  log_user: pho
-  log_server: server4
-  log_gpu: gpu0
-  # choose from [TRAIN, INFERENCE]
-  mode: TRAIN
-  # choose from [diffbir, diffbir_testr]
-  model_name: diffbir
+  log_additional_msg: TRAIN_STAGE1
+  mode: TRAIN             # choose from [TRAIN, INFERENCE]
+  model_name: diffbir     # choose from [diffbir, diffbir_testr]
   testr_ckpt_dir:
-  # finetuning_method: testr, ctrlnet, ctrlnet_and_testr, ctrlnet_and_unetAttn, ctrlnet_and_unetAttn_and_testr
-  finetuning_method: ctrlnet_and_unetAttn
+  finetuning_method: ctrlnet_and_unetAttn       # choose from [ctrlnet_and_unetAttn, testr, ctrlnet_and_unetAttn_and_testr]
   unet_feat_sampling_timestep: [10,20,30,40,50]
   resume_ckpt_dir:
   ocr_loss_weight: 0.0
