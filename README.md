@@ -33,13 +33,6 @@ Hyunhee&nbsp;Park<sup>4†</sup> ·
 <sup>3</sup> Yonsei&nbsp;University ·
 <sup>4</sup> Samsung&nbsp;Electronics
 
-<!-- <p align="center">
-    <img src="assets/terediff_teaser.png" width="1000">
-</p> -->
-
-<!-- <sub><sup>*</sup> Equal&nbsp;contribution  <sup>†</sup> Corresponding&nbsp;authors</sub> -->
-
-<!-- ### [Paper&nbsp;(Coming&nbsp;soon)](#) | [Project&nbsp;Page](https://cvlab-kaist.github.io/TAIR) -->
 
 </div>
 
