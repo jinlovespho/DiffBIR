@@ -1,6 +1,6 @@
 model:
   cldm:
-    target: diffbir.model.cldm.ControlLDM
+    target: terediff.model.cldm.ControlLDM
     params:
       latent_scale_factor: 0.18215
       unet_cfg:
@@ -67,7 +67,7 @@ model:
         legacy: False
 
   swinir:
-    target: diffbir.model.swinir.SwinIR
+    target: terediff.model.swinir.SwinIR
     params:
       img_size: 64
       patch_size: 1
@@ -85,7 +85,7 @@ model:
       unshuffle_scale: 8
 
   diffusion:
-    target: diffbir.model.gaussian_diffusion.Diffusion
+    target: terediff.model.gaussian_diffusion.Diffusion
     params:
       linear_start: 0.00085
       linear_end: 0.0120
@@ -98,12 +98,12 @@ dataset:
   dataset_type: realsr
 
   train:
-    target: diffbir.dataset.realesrgan.RealESRGANDataset
+    target: terediff.dataset.realesrgan.RealESRGANDataset
     params:
-      # file_list: /media/dataset2/text_restoration/100K_oldest
       file_list: /media/dataset2/text_restoration/tair_published/sa_text
+      # file_list: /SET/PATH/TO/sa_text
       file_backend_cfg:
-        target: diffbir.dataset.file_backend.HardDiskBackend
+        target: terediff.dataset.file_backend.HardDiskBackend
 
       out_size: 512
       crop_type: none
@@ -133,23 +133,20 @@ dataset:
 
       data_args: {
         'mode': 'TRAIN',
-        'datasets':['sam_clean'], 
-        # 'ann_path':'/media/dataset2/text_restoration/100K_oldest/combined_restoration_dataset.json',
+        'datasets':['sam_cleaned_100k'], 
         'ann_path':'/media/dataset2/text_restoration/tair_published/sa_text/restoration_dataset.json',
-        # xywh_unscaled, xyxy_scaled, cxcywh_scaled
-        'bbox_format': 'cxcywh_scaled', 
+        # 'ann_path': '/SET/PATH/TO/restoration_dataset.json',
         'model_img_size': [512, 512],
-        'use_gtprompt': True,
         }
 
   # validation data confid
   val:
-    target: diffbir.dataset.realesrgan.RealESRGANDataset
+    target: terediff.dataset.realesrgan.RealESRGANDataset
     params:
-      # file_list: /media/dataset2/text_restoration/100K_oldest
       file_list: /media/dataset2/text_restoration/tair_published/sa_text
+      # file_list: /SET/PATH/TO/sa_text
       file_backend_cfg:
-        target: diffbir.dataset.file_backend.HardDiskBackend
+        target: terediff.dataset.file_backend.HardDiskBackend
 
       out_size: 512
       crop_type: none
@@ -179,19 +176,16 @@ dataset:
 
       data_args: {
         'mode': 'VAL',
-        'datasets':['sam_clean'], 
-        # 'ann_path':'/media/dataset2/text_restoration/100K_oldest/combined_restoration_dataset.json',
+        'datasets':['sam_cleaned_100k'], 
         'ann_path':'/media/dataset2/text_restoration/tair_published/sa_text/restoration_dataset.json',
-        # xywh_unscaled, xyxy_scaled, cxcywh_scaled
-        'bbox_format': 'cxcywh_scaled', 
+        # 'ann_path': '/SET/PATH/TO/restoration_dataset.json',
         'model_img_size': [512, 512],
-        'use_gtprompt': True,
         }
 
 
 
 train_batch_transform:
-  target: diffbir.dataset.batch_transform.RealESRGANBatchTransform
+  target: terediff.dataset.batch_transform.RealESRGANBatchTransform
   params:
     use_sharpener: true
     # Queue size of training pool, this should be multiples of batch_size (per GPU).
@@ -219,7 +213,7 @@ train_batch_transform:
 
 
 val_batch_transform:
-  target: diffbir.dataset.batch_transform.RealESRGANBatchTransform
+  target: terediff.dataset.batch_transform.RealESRGANBatchTransform
   params:
     use_sharpener: true
     # Queue size of training pool, this should be multiples of batch_size (per GPU).
@@ -280,13 +274,11 @@ log_args:
 
 
 exp_args:
-  log_additional_msg: TRAIN_STAGE3
-  mode: TRAIN                 # choose from [TRAIN, INFERENCE]
-  model_name: diffbir_testr   # choose from [diffbir, diffbir_testr]
+  mode: TRAIN                       # choose from [TRAIN, VAL]
+  model_name: terediff_stage3       # choose from [terediff_stage1, terediff_stage2, terediff_stage3]
   testr_ckpt_dir: ./weights/totaltext_testr_R_50_polygon.pth
-  finetuning_method: ctrlnet_and_unetAttn_and_testr   # choose from [ctrlnet_and_unetAttn, testr, ctrlnet_and_unetAttn_and_testr]
+  finetuning_method: all_modules    # choose from [image_restoration_module, text_spotting_module, all_modules]
   unet_feat_sampling_timestep: [10,20,30,40,50]
-  # resume_ckpt_dir: ./model_ckpts/sam_cleaned_100k/stage2/pho_server4_gpu1_TRAIN_DATA_sam_clean_MODEL_diffbir_testr_FT_testr_bs3_lr0.0001_SAM100k_STAGE2_GTprompt_testrPretrained_swinReal_kernelReal_ctrlV21_unetV21/0100000.pt
   resume_ckpt_dir: /media/dataset2/jinlovespho/nips2025/DiffBIR/model_ckpts/sam_cleaned_100k/stage3/pho_server4_gpu2_TRAIN_DATA_sam_clean_MODEL_diffbir_testr_FT_ctrlnet_and_unetAttn_and_testr_bs3_lr1e-05_SAM100k_STAGE3_GTprompt_testrPretrained_swinReal_kernelReal_ctrlV21_unetV21/0075000.pt
   ocr_loss_weight: 0.01
 

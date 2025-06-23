@@ -390,3 +390,20 @@ def calculate_psnr_pt(img, img2, crop_border, test_y_channel=False):
 
     mse = torch.mean((img - img2) ** 2, dim=[1, 2, 3])
     return 10.0 * torch.log10(1.0 / (mse + 1e-8))
+
+
+def text_to_image(lines, image_width=800, line_height=20, font_size=16):
+    height = line_height * len(lines) + 20
+    img = Image.new("RGB", (image_width, height), color="white")
+    draw = ImageDraw.Draw(img)
+
+    try:
+        font = ImageFont.truetype("DejaVuSansMono.ttf", font_size)
+    except:
+        font = ImageFont.load_default()
+
+    for i, line in enumerate(lines):
+        draw.text((10, i * line_height), line.strip(), fill="black", font=font)
+
+    return img
+

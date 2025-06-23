@@ -1,83 +1,16 @@
-from typing import List
-import numpy as np
 import torch
 from torch import nn
-import torch.nn.functional as F
 
-from detectron2.modeling.meta_arch.build import META_ARCH_REGISTRY
-from detectron2.modeling import build_backbone
-from detectron2.modeling.postprocessing import detector_postprocess as d2_postprocesss
 from detectron2.structures import ImageList, Instances
-
-from testr.adet.layers.pos_encoding import PositionalEncoding2D
 from testr.adet.modeling.testr.losses import SetCriterion
 from testr.adet.modeling.testr.matcher import build_matcher
 from testr.adet.modeling.testr.models import TESTR
 from testr.adet.utils.misc import NestedTensor, box_xyxy_to_cxcywh
 
 
-# class Joiner(nn.Sequential):
-#     def __init__(self, backbone, position_embedding):
-#         super().__init__(backbone, position_embedding)
-
-#     def forward(self, tensor_list: NestedTensor):
-#         # self[0]: backbone
-#         # self[1]: pos encoding
-#         xs = self[0](tensor_list)
-#         out: List[NestedTensor] = []
-#         pos = []
-#         for _, x in xs.items():
-#             out.append(x)
-#             # position encoding
-#             pos.append(self[1](x).to(x.tensors.dtype))
-
-#         return out, pos
-
-# class MaskedBackbone(nn.Module):
-#     """ This is a thin wrapper around D2's backbone to provide padding masking"""
-#     def __init__(self, cfg):
-#         super().__init__()
-#         self.backbone = build_backbone(cfg)
-#         backbone_shape = self.backbone.output_shape()
-#         self.feature_strides = [backbone_shape[f].stride for f in backbone_shape.keys()]
-#         self.num_channels = backbone_shape[list(backbone_shape.keys())[-1]].channels
-
-#     def forward(self, images):
-#         # breakpoint()
-#         features = self.backbone(images.tensor)
-#         masks = self.mask_out_padding(
-#             [features_per_level.shape for features_per_level in features.values()],
-#             images.image_sizes,
-#             images.tensor.device,
-#         )
-#         assert len(features) == len(masks)
-#         for i, k in enumerate(features.keys()):
-#             features[k] = NestedTensor(features[k], masks[i])
-#         return features
-
-#     def mask_out_padding(self, feature_shapes, image_sizes, device):
-#         masks = []
-#         assert len(feature_shapes) == len(self.feature_strides)
-#         for idx, shape in enumerate(feature_shapes):
-#             N, _, H, W = shape
-#             masks_per_feature_level = torch.ones((N, H, W), dtype=torch.bool, device=device)
-#             for img_idx, (h, w) in enumerate(image_sizes):
-#                 masks_per_feature_level[
-#                     img_idx,
-#                     : int(np.ceil(float(h) / self.feature_strides[idx])),
-#                     : int(np.ceil(float(w) / self.feature_strides[idx])),
-#                 ] = 0
-#             masks.append(masks_per_feature_level)
-#         return masks
-
-
 def detector_postprocess(results, output_height, output_width, mask_threshold=0.5):
-    """
-    In addition to the post processing of detectron2, we add scalign for 
-    bezier control points.
-    """
+
     scale_x, scale_y = (output_width / results.image_size[1], output_height / results.image_size[0])
-    # results = d2_postprocesss(results, output_height, output_width, mask_threshold)
 
     # scale bezier points
     if results.has("beziers"):
@@ -103,7 +36,6 @@ def detector_postprocess(results, output_height, output_width, mask_threshold=0.
     return results
 
 
-# @META_ARCH_REGISTRY.register()
 class TransformerDetector(nn.Module):
     """
     Same as :class:`detectron2.modeling.ProposalNetwork`.
@@ -113,13 +45,8 @@ class TransformerDetector(nn.Module):
         super().__init__()
         self.device = torch.device(cfg.MODEL.DEVICE)
         
-        # d2_backbone = MaskedBackbone(cfg)
-        N_steps = cfg.MODEL.TRANSFORMER.HIDDEN_DIM // 2
         self.test_score_threshold = cfg.MODEL.TRANSFORMER.INFERENCE_TH_TEST
         self.use_polygon = cfg.MODEL.TRANSFORMER.USE_POLYGON
-        # backbone = Joiner(d2_backbone, PositionalEncoding2D(N_steps, normalize=True))
-        # backbone.num_channels = d2_backbone.num_channels
-        # self.testr = TESTR(cfg, backbone)
         self.testr = TESTR(cfg)
 
         box_matcher, point_matcher = build_matcher(cfg)
@@ -145,10 +72,8 @@ class TransformerDetector(nn.Module):
                                       weight_dict, enc_losses, dec_losses, self.testr.num_ctrl_points, 
                                       focal_alpha=loss_cfg.FOCAL_ALPHA, focal_gamma=loss_cfg.FOCAL_GAMMA)
 
-        # pixel_mean = torch.Tensor(cfg.MODEL.PIXEL_MEAN).to(self.device).view(3, 1, 1)
-        # pixel_std = torch.Tensor(cfg.MODEL.PIXEL_STD).to(self.device).view(3, 1, 1)
-        # self.normalizer = lambda x: (x - pixel_mean) / pixel_std
         self.to(self.device)
+
 
     def preprocess_image(self, batched_inputs):
         """
@@ -158,98 +83,27 @@ class TransformerDetector(nn.Module):
         images = ImageList.from_tensors(images)
         return images
 
-    def forward(self, extracted_feats, targets):
-        """
-        Args:
-            batched_inputs: a list, batched outputs of :class:`DatasetMapper` .
-                Each item in the list contains the inputs for one image.
-                For now, each item in the list is a dict that contains:
 
-                * image: Tensor, image in (C, H, W) format.
-                * instances (optional): groundtruth :class:`Instances`
-                * proposals (optional): :class:`Instances`, precomputed proposals.
-
-                Other information that's included in the original dicts, such as:
-
-                * "height", "width" (int): the output resolution of the model, used in inference.
-                  See :meth:`postprocess` for details.
-
-        Returns:
-            list[dict]:
-                Each dict is the output for one input image.
-                The dict contains one key "instances" whose value is a :class:`Instances`.
-                The :class:`Instances` object has the following keys:
-                "pred_boxes", "pred_classes", "scores", "pred_masks", "pred_keypoints"
-        """
-
-        # images = self.preprocess_image(batched_inputs)
+    def forward(self, extracted_feats, targets, MODE='TRAIN'):
         output = self.testr(extracted_feats)
-
-
-        '''
-        (Pdb) output.keys() 
-        dict_keys(['pred_logits', 'pred_ctrl_points', 'pred_texts', 'aux_outputs', 'enc_outputs'])
-        
-        (Pdb) output['pred_logits'].shape           # for 100 query points, each have 16 polygon points, these will be used for text classification
-        torch.Size([4, 100, 16, 1])
-
-        (Pdb) output['pred_ctrl_points'].shape      # for 100 query points, each have 16 polygon points, where each point is (x,y)
-        torch.Size([4, 100, 16, 2])
-
-        (Pdb) output['pred_texts'].shape            # for 100 query points, each have max_word_len=25, which will be used to predict a word
-        torch.Size([4, 100, 25, 97])
-
-
-        '''
-
-        ## USING ONLY ENCODE BOUNDING BOX!! 
-        # enc_out = output['enc_outputs']
-        # box_cls = enc_out['pred_logits']        # b 7252 1  
-        # box_coord = enc_out['pred_boxes']       # b 7252 4        
-        # topk=10
-        # box_cls = box_cls.sigmoid()
-        # topk_val, topk_proposals = torch.topk(box_cls[..., 0], topk, dim=1)  # b 100
-        # topk_coords_unact = torch.gather(box_coord, 1, topk_proposals.unsqueeze(-1).repeat(1, 1, 4))  # b 100 4
-        # enc_box_points = topk_coords_unact.detach()      # b 10 4
-        # loss_dict = self.criterion(output, targets)
-        # weight_dict = self.criterion.weight_dict
-        # for k in loss_dict.keys():
-        #     if k in weight_dict:
-        #         loss_dict[k] *= weight_dict[k]
-        # return loss_dict, enc_box_points
-    
-
         bs = output['pred_logits'].shape[0]
         image_sizes = [(512,512) for _ in range(bs)]
-
-
-        # gt_instances = [x["instances"].to(self.device) for x in batched_inputs]
-        # targets = self.prepare_targets(gt_instances)
-        loss_dict = self.criterion(output, targets)
-        weight_dict = self.criterion.weight_dict
-        for k in loss_dict.keys():
-            if k in weight_dict:
-                loss_dict[k] *= weight_dict[k]
-
+        
+        if MODE == 'TRAIN':
+            loss_dict = self.criterion(output, targets)
+            weight_dict = self.criterion.weight_dict
+            for k in loss_dict.keys():
+                if k in weight_dict:
+                    loss_dict[k] *= weight_dict[k]
+        elif MODE == 'VAL':
+            loss_dict=None
         
         ctrl_point_cls = output["pred_logits"]          # b k 16 1
         ctrl_point_coord = output["pred_ctrl_points"]   # b k 16 2 
         text_pred = output["pred_texts"]                # b k 25 97
         results = self.inference(ctrl_point_cls, ctrl_point_coord, text_pred, image_sizes)
-
-
         return loss_dict, results
     
-        processed_results = []
-        for results_per_image, input_per_image, image_size in zip(results, batched_inputs, image_sizes):
-            # breakpoint()
-            height = input_per_image.get("height", image_size[0])
-            width = input_per_image.get("width", image_size[1])
-            r = detector_postprocess(results_per_image, height, width)      # scale polygon coord values
-            processed_results.append({"instances": r})
-        return processed_results
-        
-
 
     def prepare_targets(self, targets):
         new_targets = []
@@ -265,6 +119,7 @@ class TransformerDetector(nn.Module):
             new_targets.append({"labels": gt_classes, "boxes": gt_boxes, "ctrl_points": gt_ctrl_points, "texts": gt_text})
         return new_targets
 
+
     def inference(self, ctrl_point_cls, ctrl_point_coord, text_pred, image_sizes):
         assert len(ctrl_point_cls) == len(image_sizes)
         results = []
@@ -276,7 +131,6 @@ class TransformerDetector(nn.Module):
         for scores_per_image, labels_per_image, ctrl_point_per_image, text_per_image, image_size in zip(
             scores, labels, ctrl_point_coord, text_pred, image_sizes
         ):
-            # breakpoint()
             selector = scores_per_image >= self.test_score_threshold
             scores_per_image = scores_per_image[selector]
             labels_per_image = labels_per_image[selector]

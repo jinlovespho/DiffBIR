@@ -18,6 +18,8 @@ __pycache__
 /meta_files
 vis/
 wandb/
+val_demo_result/
+model_ckpts/
 
 # compilation and distribution
 __pycache__

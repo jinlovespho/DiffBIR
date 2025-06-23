@@ -2,21 +2,23 @@ import cv2
 import copy
 import wandb
 import pyiqa
-from tqdm import tqdm
 import numpy as np
+from tqdm import tqdm
+from einops import rearrange
+from omegaconf import OmegaConf
+from argparse import ArgumentParser
+from accelerate import Accelerator
+from accelerate.utils import set_seed
+from accelerate.utils import DistributedDataParallelKwargs
+
 import torch
 import torch.nn as nn
-from omegaconf import OmegaConf
-from accelerate import Accelerator
-from argparse import ArgumentParser
-from accelerate.utils import set_seed
-from einops import rearrange
-from diffbir.utils.common import instantiate_from_config, to, log_txt_as_img
-from diffbir.model import ControlLDM, Diffusion
-from diffbir.sampler import SpacedSampler
+
+from terediff.sampler import SpacedSampler
+from terediff.model import ControlLDM, Diffusion
+from terediff.dataset.utils import encode, decode 
+from terediff.utils.common import instantiate_from_config, to, log_txt_as_img
 import initialize
-from diffbir.dataset.utils import encode, decode 
-from accelerate.utils import DistributedDataParallelKwargs
 
 
 def main(args):
@@ -147,9 +149,7 @@ def main(args):
             diff_loss, extracted_feats = diffusion.p_losses(models['cldm'], z_0, t, cond_aug, cfg)
             
                 
-            # ================================= OCR =================================
-            if cfg.exp_args.model_name == 'diffbir_testr':
-
+            if cfg.exp_args.model_name == 'terediff_stage2' or cfg.exp_args.model_name == 'terediff_stage3':
                 # process annotations for OCR training loss
                 train_targets=[]
                 for i in range(train_bs):
@@ -160,24 +160,17 @@ def main(args):
                     tmp_dict['texts'] = text_encs[i]
                     tmp_dict['ctrl_points'] = polys[i]
                     train_targets.append(tmp_dict)
-
-
                 # OCR model forward pass
                 ocr_loss_dict, _ = models['testr'](extracted_feats, train_targets)
-
                 # OCR total_loss
                 ocr_tot_loss = sum(ocr_loss_dict.values())
-
                 # OCR losses
                 for ocr_key, ocr_val in ocr_loss_dict.items():
                     if ocr_key in ocr_losses.keys():
                         ocr_losses[ocr_key].append(ocr_val.item())
                     else:
                         ocr_losses[ocr_key]=[ocr_val.item()]
-
                 total_loss = diff_loss + cfg.exp_args.ocr_loss_weight * ocr_tot_loss      
-
-
             else:
                 total_loss = diff_loss
                 ocr_tot_loss=torch.tensor(0).cuda()
@@ -312,7 +305,7 @@ def main(args):
                         )
 
                         # =========================== OCR ===========================
-                        if cfg.exp_args.model_name == 'diffbir_testr':
+                        if cfg.exp_args.model_name == 'terediff_stage2' or cfg.exp_args.model_name == 'terediff_stage3':
 
                             # process annotations for OCR val loss 
                             val_targets=[]
@@ -373,7 +366,6 @@ def main(args):
                         tot_val_maniqa.append(torch.mean(metric_maniqa(torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, min=0, max=1),torch.clamp((val_log_gt + 1) / 2, min=0, max=1))).item())
                         tot_val_clipiqa.append(torch.mean(metric_clipiqa(torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, min=0, max=1),torch.clamp((val_log_gt + 1) / 2, min=0, max=1))).item())
                         
-
 
                         # log sampling val imgs to wandb
                         if accelerator.is_main_process and cfg.log_args.log_tool == 'wandb':

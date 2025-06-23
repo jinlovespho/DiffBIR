@@ -3,26 +3,35 @@ import sys
 import wandb 
 import argparse
 from omegaconf import OmegaConf
-from diffbir.model import ControlLDM, SwinIR, Diffusion
-from diffbir.utils.common import instantiate_from_config, to, log_txt_as_img
-from diffbir.dataset.codeformer import collate_fn_code
-from diffbir.dataset.realesrgan import collate_fn_real
+
+import torch 
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
-import torch 
+
+from terediff.model import ControlLDM, SwinIR, Diffusion
+from terediff.utils.common import instantiate_from_config, to, log_txt_as_img
+from terediff.dataset.codeformer import collate_fn_code
+from terediff.dataset.realesrgan import collate_fn_real
 
 
 def load_experiment_settings(accelerator, cfg):
+    
+    if cfg.exp_args.mode == 'TRAIN':
+        datasets='_'.join((cfg.dataset.train.params.data_args['datasets']))
+        exp_name = f"{cfg.exp_args.mode}_{cfg.exp_args.model_name}_{cfg.exp_args.finetuning_method}_bs{cfg.train.batch_size}_lr{cfg.train.learning_rate}"
 
-    # EXPERIMENT NAME
-    datasets='_'.join((cfg.dataset.train.params.data_args['datasets']))
-    exp_name = f"{cfg.exp_args.mode}_{cfg.exp_args.model_name}_{cfg.exp_args.finetuning_method}_bs{cfg.train.batch_size}_lr{cfg.train.learning_rate}_{cfg.exp_args.log_additional_msg}"
-
-    # setup an experiment folder
-    exp_dir = cfg.train.exp_dir
-    os.makedirs(exp_dir, exist_ok=True)
-    ckpt_dir = os.path.join(exp_dir, exp_name)
-    os.makedirs(ckpt_dir, exist_ok=True)
+        # setup an experiment folder
+        exp_dir = cfg.train.exp_dir
+        os.makedirs(exp_dir, exist_ok=True)
+        ckpt_dir = os.path.join(exp_dir, exp_name)
+        os.makedirs(ckpt_dir, exist_ok=True)
+        
+    elif cfg.exp_args.mode == 'VAL':
+        datasets = cfg.dataset.val_dataset_name 
+    
+        exp_name = f"{cfg.exp_args.mode}_{cfg.exp_args.model_name}"
+        exp_dir=None
+        ckpt_dir=None
 
     if accelerator.is_main_process:
         # setup logging tool
@@ -41,12 +50,8 @@ def load_data(accelerator, cfg):
     train_ds = instantiate_from_config(cfg.dataset.train)
     val_ds = instantiate_from_config(cfg.dataset.val)
     
-    
     if cfg.dataset.dataset_type == 'realsr':
         collate_fn = collate_fn_real
-    elif cfg.dataset.dataset_type == 'codeformer':
-        collate_fn = collate_fn_code 
-
 
     # set data loader 
     train_loader = DataLoader(
@@ -121,7 +126,7 @@ def load_model(accelerator, device, args, cfg):
     loaded_models['swinir'] = swinir.eval().to(device)
     
     # training ocr detection with diffbir features
-    if cfg.exp_args.model_name == 'diffbir_testr':
+    if cfg.exp_args.model_name == 'terediff_stage2' or cfg.exp_args.model_name == 'terediff_stage3':
         sys.path.append(f'{os.getcwd()}/testr')
         from testr.adet.modeling.transformer_detector import TransformerDetector
         from testr.adet.config import get_cfg
@@ -174,8 +179,8 @@ def set_training_params(accelerator, models, cfg):
         for name, param in model.named_parameters():
             all_model_names.append(name)
             
-            # stage1 training
-            if cfg.exp_args.finetuning_method == 'ctrlnet_and_unetAttn':
+            # stage1 training (training the ctrlnet and unet attention layers of the image restoration module)
+            if cfg.exp_args.finetuning_method == 'image_restoration_module':
                 if 'controlnet' in name or ('unet' in name and 'attn' in name):
                     param.requires_grad = True
                     train_model_names.append(name)
@@ -183,8 +188,8 @@ def set_training_params(accelerator, models, cfg):
                 else:
                     param.requires_grad = False
             
-            # stage2 training
-            elif cfg.exp_args.finetuning_method == 'testr':
+            # stage2 training (training the text spotting module)
+            elif cfg.exp_args.finetuning_method == 'text_spotting_module':
                 if 'testr' in name:
                     param.requires_grad = True
                     train_model_names.append(name)
@@ -192,8 +197,8 @@ def set_training_params(accelerator, models, cfg):
                 else:
                     param.requires_grad = False
             
-            # stage3 training
-            elif cfg.exp_args.finetuning_method == 'ctrlnet_and_unetAttn_and_testr':
+            # stage3 training (training both the image restoration and text spotting modules)
+            elif cfg.exp_args.finetuning_method == 'all_modules':
                 if 'controlnet' in name or ('unet' in name and 'attn' in name) or ('testr' in name):
                     param.requires_grad = True
                     train_model_names.append(name)

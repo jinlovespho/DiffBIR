@@ -7,7 +7,7 @@ from tqdm import tqdm
 from .sampler import Sampler
 from ..model.gaussian_diffusion import extract_into_tensor
 from ..model.cldm import ControlLDM
-from ..utils.common import make_tiled_fn, trace_vram_usage
+from terediff.dataset.utils import encode, decode 
 
 
 # https://github.com/openai/guided-diffusion/blob/main/guided_diffusion/respace.py
@@ -96,9 +96,6 @@ class SpacedSampler(Sampler):
         posterior_variance = (
             betas * (1.0 - alphas_cumprod_prev) / (1.0 - alphas_cumprod)
         )
-        # posterior_log_variance_clipped = np.log(
-        #     np.append(posterior_variance[1], posterior_variance[1:])
-        # )
         if len(posterior_variance) > 1:
             posterior_log_variance_clipped = np.log(
                 np.append(posterior_variance[1], posterior_variance[1:])
@@ -206,27 +203,12 @@ class SpacedSampler(Sampler):
         tile_stride: int = -1,
         x_T: torch.Tensor | None = None,
         progress: bool = True,
-        cfg=None
+        cfg=None,
     ) -> torch.Tensor:
 
         self.make_schedule(steps)
         self.to(device)
-        if tiled:   # f
-            forward = model.forward
-            model.forward = make_tiled_fn(
-                lambda x_tile, t, cond, hi, hi_end, wi, wi_end: (
-                    forward(
-                        x_tile,
-                        t,
-                        {
-                            "c_txt": cond["c_txt"],
-                            "c_img": cond["c_img"][..., hi:hi_end, wi:wi_end],
-                        },
-                    )
-                ),
-                tile_size,
-                tile_stride,
-            )
+
         if x_T is None: # t
             x_T = torch.randn(x_size, device=device, dtype=torch.float32)
 
@@ -258,6 +240,190 @@ class SpacedSampler(Sampler):
             if i+1 in sampling_steps:
                 sampled_unet_feats.append( (i+1, current_timestep, extracted_feats) )
 
-        if tiled:   # f
-            model.forward = forward
         return x, sampled_unet_feats 
+
+    @torch.no_grad()
+    def val_sample(
+        self,
+        model: ControlLDM,
+        device: str,
+        steps: int,
+        x_size: Tuple[int],
+        cond: Dict[str, torch.Tensor],
+        uncond: Dict[str, torch.Tensor],
+        cfg_scale: float,
+        tiled: bool = False,
+        tile_size: int = -1,
+        tile_stride: int = -1,
+        x_T: torch.Tensor | None = None,
+        progress: bool = True,
+        cfg=None,
+        pure_cldm=None,
+        ts_model=None,
+        val_prompt=None
+    ) -> torch.Tensor:
+
+        self.make_schedule(steps)
+        self.to(device)
+        
+        if x_T is None: # t
+            x_T = torch.randn(x_size, device=device, dtype=torch.float32)
+
+        x = x_T
+        timesteps = np.flip(self.timesteps)
+        total_steps = len(self.timesteps)
+        iterator = tqdm(timesteps, total=total_steps, disable=not progress)
+        bs = x_size[0]
+
+        assert ts_model is not None, "Text-spotting model must be provided for validation sampling."
+
+        ts_results=[]
+        for i, current_timestep in enumerate(iterator):
+            model_t = torch.full((bs,), current_timestep, device=device, dtype=torch.long)
+            t = torch.full((bs,), total_steps - i - 1, device=device, dtype=torch.long)
+            cur_cfg_scale = self.get_cfg_scale(cfg_scale, current_timestep)
+            x, extracted_feats = self.p_sample(
+                model,
+                x,
+                model_t,
+                t,
+                cond,
+                uncond,
+                cur_cfg_scale,
+            )
+            
+            # Text-spotting model forward pass 
+            _, sampling_val_ocr_results = ts_model(extracted_feats, None, cfg.exp_args.mode)
+            
+            results_per_img = sampling_val_ocr_results[0]
+
+            pred_texts=[]
+            pred_polys=[]
+            
+            for j in range(len(results_per_img.polygons)):
+                val_ctrl_pnt= results_per_img.polygons[j].view(16,2).cpu().detach().numpy().astype(np.int32)    # 32 -> 16 2
+                val_rec = results_per_img.recs[j]
+                val_pred_text = decode(val_rec)
+                
+                pred_polys.append(val_ctrl_pnt)
+                pred_texts.append(val_pred_text)
+                
+
+            caption = [f'"{txt}"' for txt in pred_texts] 
+            if cfg.exp_args.prompt_style == 'CAPTION':
+                pred_prompt = f"A realistic scene where the texts {', '.join(caption) } appear clearly on signs, boards, buildings, or other objects."
+            elif cfg.exp_args.prompt_style == 'TAG':
+                pred_prompt = f"{', '.join(caption)}"
+            cond['c_txt'] = pure_cldm.clip.encode(pred_prompt)  # b 77 1024
+
+            ts_results.append(
+                dict(
+                    timestep = current_timestep,
+                    pred_texts = pred_texts,
+                    pred_prompt = pred_prompt,
+                    pred_polys = pred_polys
+                )
+            )
+
+        return x, ts_results 
+    
+    # @torch.no_grad()
+    # def val_sample(
+    #     self,
+    #     model: ControlLDM,
+    #     device: str,
+    #     steps: int,
+    #     x_size: Tuple[int],
+    #     cond: Dict[str, torch.Tensor],
+    #     uncond: Dict[str, torch.Tensor],
+    #     cfg_scale: float,
+    #     tiled: bool = False,
+    #     tile_size: int = -1,
+    #     tile_stride: int = -1,
+    #     x_T: torch.Tensor | None = None,
+    #     progress: bool = True,
+    #     cfg=None,
+    #     pure_cldm=None,
+    #     ts_model=None,
+    #     val_texts=None,
+    #     val_prompt=None
+    # ) -> torch.Tensor:
+
+    #     self.make_schedule(steps)
+    #     self.to(device)
+        
+    #     if x_T is None: # t
+    #         x_T = torch.randn(x_size, device=device, dtype=torch.float32)
+
+    #     x = x_T
+    #     timesteps = np.flip(self.timesteps)
+    #     total_steps = len(self.timesteps)
+    #     iterator = tqdm(timesteps, total=total_steps, disable=not progress)
+    #     bs = x_size[0]
+
+    #     assert ts_model is not None, "Text-spotting model must be provided for validation sampling."
+
+    #     ts_results=[]
+    #     for i, current_timestep in enumerate(iterator):
+    #         model_t = torch.full((bs,), current_timestep, device=device, dtype=torch.long)
+    #         t = torch.full((bs,), total_steps - i - 1, device=device, dtype=torch.long)
+    #         cur_cfg_scale = self.get_cfg_scale(cfg_scale, current_timestep)
+    #         x, extracted_feats = self.p_sample(
+    #             model,
+    #             x,
+    #             model_t,
+    #             t,
+    #             cond,
+    #             uncond,
+    #             cur_cfg_scale,
+    #         )
+            
+    #         # Text-spotting model forward pass 
+    #         _, sampling_val_ocr_results = ts_model(extracted_feats, None, cfg.exp_args.mode)
+            
+    #         results_per_img = sampling_val_ocr_results[0]
+
+    #         pred_texts=[]
+    #         pred_polys=[]
+            
+    #         for j in range(len(results_per_img.polygons)):
+    #             val_ctrl_pnt= results_per_img.polygons[j].view(16,2).cpu().detach().numpy().astype(np.int32)    # 32 -> 16 2
+    #             val_rec = results_per_img.recs[j]
+    #             val_pred_text = decode(val_rec)
+                
+    #             pred_polys.append(val_ctrl_pnt)
+    #             pred_texts.append(val_pred_text)
+                
+    #         # process predicted texts from OCR
+    #         if cfg.exp_args.use_gtprompt:
+    #             pred_prompt = val_prompt 
+    #             pred_texts = val_texts
+            
+    #         elif cfg.exp_args.use_nullprompt:
+    #             pred_prompt = val_prompt 
+    #             pred_texts = [""]
+                
+    #         elif cfg.exp_args.use_ocrprompt:
+    #             caption = [f'"{txt}"' for txt in pred_texts] 
+    #             if cfg.exp_args.prompt_style == 'CAPTION':
+    #                 pred_prompt = f"A realistic scene where the texts {', '.join(caption) } appear clearly on signs, boards, buildings, or other objects."
+    #             elif cfg.exp_args.prompt_style == 'TAG':
+    #                 pred_prompt = f"{', '.join(caption)}"
+                    
+                
+    #             cond['c_txt'] = pure_cldm.clip.encode(pred_prompt)  # b 77 1024
+            
+    #         elif cfg.exp_args.use_llavaprompt:
+    #             pred_prompt = val_prompt 
+    #             pred_texts = [""]
+                
+    #         ts_results.append(
+    #             dict(
+    #                 timestep = current_timestep,
+    #                 pred_texts = pred_texts,
+    #                 pred_prompt = pred_prompt,
+    #                 pred_polys = pred_polys
+    #             )
+    #         )
+
+    #     return x, ts_results 
