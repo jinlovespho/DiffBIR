@@ -94,9 +94,20 @@ model:
       parameterization: v
 
 
+# dataset:
+#   gt_img_path: ./assets/demo_imgs/hq
+#   lq_img_path: ./assets/demo_imgs/lq
+
 dataset:
-  gt_img_path: ./assets/demo_imgs/hq
-  lq_img_path: ./assets/demo_imgs/lq
+  gt_img_path: /media/dataset2/text_restoration/100K/test
+  # lq_img_path: /media/dataset2/text_restoration/SAMText_test_degradation/lv3
+  lq_img_path: /media/dataset2/text_restoration/SAMText_test_degradation/lv2
+  # lq_img_path: /media/dataset2/text_restoration/SAMText_test_degradation/lv1
+
+# dataset:
+#   gt_img_path: /media/dataset2/text_restoration/real_benchmark_full/HQ
+#   lq_img_path: /media/dataset2/text_restoration/real_benchmark_full/LQ
+
 
 
 train:
