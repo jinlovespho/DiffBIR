@@ -101,35 +101,19 @@ Training is conducted in three stages:
 - **Stage 3**: Jointly train both modules.
 
 
-#### Training Script
-The training configuration files for three stages: [stage1](configs/train/train_stage1_terediff.yaml), [stage2](configs/train/train_stage2_terediff.yaml), [stage3](configs/train/train_stage3_terediff.yaml)
-```
-# stage1
-bash run_script/train_script/run_train_stage1_terediff.sh
+### Training Script
 
-# stage2
-bash run_script/train_script/run_train_stage2_terediff.sh
-
-# stage3
-bash run_script/train_script/run_train_stage3_terediff.sh
-```
-
-#### Stage1 Training Script
-Run the following bash script for **Stage1** training. Its configuration file can be found [here](configs/train/train_stage1_terediff.yaml)
+- Run the following bash script for **Stage1** training. Its configuration file can be found [here](configs/train/train_stage1_terediff.yaml). Refer to the comments within the configuration file for a detailed explanation of each setting.
 
 ```
 bash run_script/train_script/run_train_stage1_terediff.sh
 ```
-
-#### Stage2 Training Script
-Run the following bash script for **Stage2** training. Its configuration file can be found [here](configs/train/train_stage2_terediff.yaml)
+- Run the following bash script for **Stage2** training. Its configuration file can be found [here](configs/train/train_stage2_terediff.yaml)
 
 ```
 bash run_script/train_script/run_train_stage2_terediff.sh
 ```
-
-#### Stage3 Training Script
-Run the following bash script for **Stage3** training. Its configuration file can be found [here](configs/train/train_stage3_terediff.yaml)
+- Run the following bash script for **Stage3** training. Its configuration file can be found [here](configs/train/train_stage3_terediff.yaml)
 
 ```
 bash run_script/train_script/run_train_stage3_terediff.sh
@@ -138,7 +122,7 @@ bash run_script/train_script/run_train_stage3_terediff.sh
 
 ## 🚀 Text-Aware Image Restoration (TAIR) Demo
 
-Run the following script to perform a demo on four low-quality images and generate high-quality, text-aware restored images.
+Run the following script to perform a demo on four low-quality images and generate high-quality, text-aware restored images. The configuration file for the bottom demo can be found [here](configs/val/val_terediff.yaml). The restored results will be saved in **val_demo_result/** by default.
 ```
 bash run_script/val_script/run_val_terediff.sh
 ```

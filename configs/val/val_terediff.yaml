@@ -93,39 +93,29 @@ model:
       zero_snr: True
       parameterization: v
 
-
-# dataset:
-#   gt_img_path: ./assets/demo_imgs/hq
-#   lq_img_path: ./assets/demo_imgs/lq
-
 dataset:
-  gt_img_path: /media/dataset2/text_restoration/100K/test
-  # lq_img_path: /media/dataset2/text_restoration/SAMText_test_degradation/lv3
-  lq_img_path: /media/dataset2/text_restoration/SAMText_test_degradation/lv2
-  # lq_img_path: /media/dataset2/text_restoration/SAMText_test_degradation/lv1
-
-# dataset:
-#   gt_img_path: /media/dataset2/text_restoration/real_benchmark_full/HQ
-#   lq_img_path: /media/dataset2/text_restoration/real_benchmark_full/LQ
-
-
+  gt_img_path: ./assets/demo_imgs/hq
+  lq_img_path: ./assets/demo_imgs/lq
 
 train:
   sd_path: ./weights/sd2.1-base-zsnr-laionaes5.ckpt       
   swinir_path: ./weights/realesrgan_s4_swinir_100k.pth
   resume: ./weights/DiffBIR_v2.1.pt
 
-
 log_args:
-  log_tool: wandb
-  wandb_key: e32eed0c2509bf898b850b0065ab62345005fb73
-  wandb_proj_name: DiffBIR_OCR_finetuning
-
+  log_tool: 
+  wandb_key: 
+  wandb_proj_name: 
+## if you wish to use wandb for logging, uncomment the following lines and set the values
+# log_args:
+#   log_tool: wandb
+#   wandb_key: PUT_YOUR_WANDB_KEY_HERE
+#   wandb_proj_name: NAME_OF_YOUR_PROJECT
 
 exp_args:
   mode: VAL
   model_name: terediff_stage3
-  testr_ckpt_dir:
-  resume_ckpt_dir: 0020000_swinReal_kernelReal_v21.pt
+  testr_ckpt_dir: 
+  resume_ckpt_dir: /PATH/TO/YOUR/STAGE3/CKPT/FILE.pt
   save_val_img_dir: ./val_demo_result
-  prompt_style: CAPTION
+  prompt_style: CAPTION   # choose from [CAPTION, TAG] for prompting styles

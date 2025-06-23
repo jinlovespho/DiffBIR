@@ -232,44 +232,6 @@ def main(args):
                         })
                 wandb.log({f'sampling_val_FINAL_VIS/{gt_id}_val_all': wandb.Image(torch.concat([val_lq, val_clean, torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, 0, 1), val_gt], dim=2), caption='lq_clean_sample,gt')})
 
-
-            # # log sampling val imgs to wandb
-            # if accelerator.is_main_process and cfg.log_args.log_tool == 'wandb':
-
-            #     # log sampling val metrics 
-            #     wandb.log({f'sampling_val_METRIC/val_psnr': torch.mean(metric_psnr(
-            #                                                                     restored_img, 
-            #                                                                     torch.clamp((val_gt + 1) / 2, min=0, max=1))).item(),
-            #             f'sampling_val_METRIC/val_ssim': torch.mean(metric_ssim(
-            #                                                                     restored_img, 
-            #                                                                     torch.clamp((val_gt + 1) / 2, min=0, max=1))).item(),
-            #             f'sampling_val_METRIC/val_lpips': torch.mean(metric_lpips(
-            #                                                                     restored_img, 
-            #                                                                     torch.clamp((val_gt + 1) / 2, min=0, max=1))).item(),
-            #             f'sampling_val_METRIC/val_dists': torch.mean(metric_dists(
-            #                                                                     restored_img, 
-            #                                                                     torch.clamp((val_gt + 1) / 2, min=0, max=1))).item(),
-            #             f'sampling_val_METRIC/val_niqe': torch.mean(metric_niqe(
-            #                                                                     restored_img, 
-            #                                                                     torch.clamp((val_gt + 1) / 2, min=0, max=1))).item(),
-            #             f'sampling_val_METRIC/val_musiq': torch.mean(metric_musiq(
-            #                                                                     restored_img, 
-            #                                                                     torch.clamp((val_gt + 1) / 2, min=0, max=1))).item(),
-            #             f'sampling_val_METRIC/val_maniqa': torch.mean(metric_maniqa(
-            #                                                                     restored_img, 
-            #                                                                     torch.clamp((val_gt + 1) / 2, min=0, max=1))).item(),
-            #             f'sampling_val_METRIC/val_clipiqa': torch.mean(metric_clipiqa(
-            #                                                                     restored_img, 
-            #                                                                     torch.clamp((val_gt + 1) / 2, min=0, max=1))).item(),
-            #             })
-                
-            #     # log sampling val images 
-            #     wandb.log({ f'sampling_val_FINAL_VIS/{gt_id}_val_gt': wandb.Image((val_gt + 1) / 2, caption=f'gt_img'),
-            #                 f'sampling_val_FINAL_VIS/{gt_id}_val_lq': wandb.Image(val_lq, caption=f'lq_img'),
-            #                 f'sampling_val_FINAL_VIS/{gt_id}_val_sampled': wandb.Image(torch.clamp((pure_cldm.vae_decode(val_z) + 1) / 2, 0, 1), caption=f'sampled_img'),
-            #                 f'sampling_val_FINAL_VIS/{gt_id}_val_prompts': wandb.Image(img_of_pred_text, caption='prompts used for sampling'),
-            #             })
-
         
     # average using numpy
     tot_val_psnr = np.array(tot_val_psnr).mean()

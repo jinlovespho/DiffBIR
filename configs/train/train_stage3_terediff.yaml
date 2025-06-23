@@ -93,21 +93,16 @@ model:
       zero_snr: True
       parameterization: v
 
-
 dataset:
   dataset_type: realsr
-
   train:
     target: terediff.dataset.realesrgan.RealESRGANDataset
     params:
-      file_list: /media/dataset2/text_restoration/tair_published/sa_text
-      # file_list: /SET/PATH/TO/sa_text
+      file_list: /SET/PATH/TO/sa_text
       file_backend_cfg:
         target: terediff.dataset.file_backend.HardDiskBackend
-
       out_size: 512
       crop_type: none
-
       use_hflip: false
       use_rot: false
 
@@ -126,16 +121,12 @@ dataset:
       blur_sigma2: [0.2, 1.5]
       betag_range2: [0.5, 4]
       betap_range2: [1, 2]
-
       final_sinc_prob: 0.8
-
       p_empty_prompt: 0.2
-
       data_args: {
         'mode': 'TRAIN',
         'datasets':['sam_cleaned_100k'], 
-        'ann_path':'/media/dataset2/text_restoration/tair_published/sa_text/restoration_dataset.json',
-        # 'ann_path': '/SET/PATH/TO/restoration_dataset.json',
+        'ann_path': '/SET/PATH/TO/restoration_dataset.json',
         'model_img_size': [512, 512],
         }
 
@@ -143,14 +134,11 @@ dataset:
   val:
     target: terediff.dataset.realesrgan.RealESRGANDataset
     params:
-      file_list: /media/dataset2/text_restoration/tair_published/sa_text
-      # file_list: /SET/PATH/TO/sa_text
+      file_list: /SET/PATH/TO/sa_text
       file_backend_cfg:
         target: terediff.dataset.file_backend.HardDiskBackend
-
       out_size: 512
       crop_type: none
-
       use_hflip: false
       use_rot: false
 
@@ -169,20 +157,14 @@ dataset:
       blur_sigma2: [0.2, 1.5]
       betag_range2: [0.5, 4]
       betap_range2: [1, 2]
-
       final_sinc_prob: 0.8
-
       p_empty_prompt: 0.0
-
       data_args: {
         'mode': 'VAL',
         'datasets':['sam_cleaned_100k'], 
-        'ann_path':'/media/dataset2/text_restoration/tair_published/sa_text/restoration_dataset.json',
-        # 'ann_path': '/SET/PATH/TO/restoration_dataset.json',
+        'ann_path': '/SET/PATH/TO/restoration_dataset.json',
         'model_img_size': [512, 512],
         }
-
-
 
 train_batch_transform:
   target: terediff.dataset.batch_transform.RealESRGANBatchTransform
@@ -198,7 +180,6 @@ train_batch_transform:
     poisson_scale_range: [0.05, 3]
     gray_noise_prob: 0.4
     jpeg_range: [30, 95]
-
     # the second degradation process
     stage2_scale: 4
     second_blur_prob: 0.8
@@ -209,8 +190,6 @@ train_batch_transform:
     poisson_scale_range2: [0.05, 2.5]
     gray_noise_prob2: 0.4
     jpeg_range2: [30, 95]
-
-
 
 val_batch_transform:
   target: terediff.dataset.batch_transform.RealESRGANBatchTransform
@@ -226,7 +205,6 @@ val_batch_transform:
     poisson_scale_range: [0.05, 3]
     gray_noise_prob: 0.4
     jpeg_range: [30, 95]
-
     # the second degradation process
     stage2_scale: 4
     second_blur_prob: 0.8
@@ -237,8 +215,6 @@ val_batch_transform:
     poisson_scale_range2: [0.05, 2.5]
     gray_noise_prob2: 0.4
     jpeg_range2: [30, 95]
-
-
 
 # training args
 train:
@@ -257,21 +233,21 @@ train:
   # experiment save directory path
   exp_dir: ./model_ckpts/sam_cleaned_100k/stage3
 
-
 val:
   num_workers: 4
   batch_size: 2
   log_num_val_img: 2
   log_image_every: 500
 
-
-
 log_args:
-  log_tool: wandb
-  wandb_key: e32eed0c2509bf898b850b0065ab62345005fb73
-  wandb_proj_name: DiffBIR_OCR_finetuning
-
-
+  log_tool: 
+  wandb_key: 
+  wandb_proj_name: 
+## We recommend using wandb, uncomment the following lines and set the values
+# log_args:
+#   log_tool: wandb
+#   wandb_key: PUT_YOUR_WANDB_KEY_HERE
+#   wandb_proj_name: NAME_OF_YOUR_PROJECT
 
 exp_args:
   mode: TRAIN                       # choose from [TRAIN, VAL]
@@ -279,7 +255,7 @@ exp_args:
   testr_ckpt_dir: ./weights/totaltext_testr_R_50_polygon.pth
   finetuning_method: all_modules    # choose from [image_restoration_module, text_spotting_module, all_modules]
   unet_feat_sampling_timestep: [10,20,30,40,50]
-  resume_ckpt_dir: /media/dataset2/jinlovespho/nips2025/DiffBIR/model_ckpts/sam_cleaned_100k/stage3/pho_server4_gpu2_TRAIN_DATA_sam_clean_MODEL_diffbir_testr_FT_ctrlnet_and_unetAttn_and_testr_bs3_lr1e-05_SAM100k_STAGE3_GTprompt_testrPretrained_swinReal_kernelReal_ctrlV21_unetV21/0075000.pt
+  resume_ckpt_dir: /PATH/TO/YOUR/STAGE2/CKPT/FILE.pt
   ocr_loss_weight: 0.01
 
 
