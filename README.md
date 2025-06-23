@@ -1,9 +1,9 @@
 <table align="center" style="border: none; border-collapse: collapse;">
-  <tr>
-    <td style="border: none;">
-      <img src="assets/diffbir_logo.png" width="400" style="border-radius: 8px; margin-right: 20px;">
+  <tr style="border: none;">
+    <td style="border: none; padding: 0;">
+      <img src="assets/diffbir_logo.png" width="300" style="border-radius: 8px; margin-right: 20px;">
     </td>
-    <td style="border: none;">
+    <td style="border: none; padding: 0;">
       <h1 style="margin: 0;">Text-Aware Image Restoration with Diffusion Models</h1>
       <p>
         <a href="https://arxiv.org/abs/2506.09993"><img src="https://img.shields.io/badge/arXiv-2506.09993-B31B1B"></a>
