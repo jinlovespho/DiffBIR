@@ -27,7 +27,7 @@ Text-Aware Image Restoration with Diffusion Models</h1>
 
 
 ## 📢 News 
-- ❤️ **2025.06.24** - Training and demo code is released!
+- ❤️ **2025.06.23** - Training code released!
 - 🤗 **2025.06.19** — **SA-Text** and **Real-Text** datasets are released along with the [dataset pipeline](https://github.com/paulcho98/text_restoration_dataset/tree/main)!
 - 📄 **2025.06.12** — Arxiv paper is released! 
 - 🚀 **2025.06.01** — Official launch of the repository and project page!
@@ -122,7 +122,7 @@ bash run_script/train_script/run_train_stage3_terediff.sh
 
 ## 🚀 Text-Aware Image Restoration (TAIR) Demo
 
-Run the following script to perform a demo on four low-quality images and generate high-quality, text-aware restored images. The configuration file for the bottom demo can be found [here](configs/val/val_terediff.yaml). The restored results will be saved in **val_demo_result/** by default.
+Download our final released checkpoint from [here](https://drive.google.com/drive/folders/12zc29o0JsnTtx3tHrLIPBdZwKZZBSNIt?usp=sharing) and run the following script to perform a demo on four low-quality images and generate high-quality, text-aware restored images. The configuration file for the bottom demo can be found [here](configs/val/val_terediff.yaml). The restored results will be saved in **val_demo_result/** by default.
 ```
 bash run_script/val_script/run_val_terediff.sh
 ```
