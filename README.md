@@ -1,56 +1,51 @@
-<table align="center" style="border: none; border-collapse: collapse;">
-  <tr style="border: none;">
-    <td style="border: none; padding: 0;">
-      <img src="assets/diffbir_logo.png" width="300" style="border-radius: 8px; margin-right: 20px;">
-    </td>
-    <td style="border: none; padding: 0;">
-      <h1 style="margin: 0;">Text-Aware Image Restoration with Diffusion Models</h1>
-      <p>
-        <a href="https://arxiv.org/abs/2506.09993"><img src="https://img.shields.io/badge/arXiv-2506.09993-B31B1B"></a>
-        <a href="https://cvlab-kaist.github.io/TAIR/"><img src="https://img.shields.io/badge/Project%20Page-online-1E90FF"></a>
-        <a href="https://huggingface.co/datasets/Min-Jaewon/SA-Text"><img src="https://img.shields.io/badge/HuggingFace-SA--Text-yellow?logo=huggingface&logoColor=yellow"></a>
-        <a href="https://huggingface.co/datasets/Min-Jaewon/Real-Text"><img src="https://img.shields.io/badge/HuggingFace-Real--Text-yellow?logo=huggingface&logoColor=yellow"></a>
-      </p>
-    </td>
-  </tr>
-</table>
+<div align="center">
+<h1>
+ TAIR: Text-Aware Image Restoration with Diffusion Models</h1>
 
 
-<div align="left">
+[**Jaewon Min**](https://github.com/Min-Jaewon/)<sup>1*</sup>, 
+[**Jin Hyeon Kim**](https://github.com/jinlovespho)<sup>2*</sup>, 
+**Paul Hyunbin Cho**<sup>1</sup>, 
+[**Jaeeun Lee**](https://github.com/babywhale03)<sup>3</sup>,
+**Jihye Park**<sup>4</sup>, 
+**Minkyu Park**<sup>4</sup>, <br>
+**Sangpil Kim**<sup>2&dagger;</sup>, 
+**Hyunhee Park**<sup>4&dagger;</sup>, 
+[**Seungryong Kim**](https://scholar.google.com/citations?hl=zh-CN&user=cIK1hS8AAAAJ)<sup>1&dagger;</sup>
 
-[Jaewon&nbsp;Min<sup>1*</sup>](https://github.com/Min-Jaewon/) · 
-[Jin&nbsp;Hyeon&nbsp;Kim<sup>2*</sup>](https://github.com/jinlovespho) · 
-Paul&nbsp;Hyunbin&nbsp;Cho<sup>1</sup> · 
-[Jaeeun&nbsp;Lee<sup>3</sup>](https://github.com/babywhale03) · 
-Jihye&nbsp;Park<sup>4</sup> · 
-Minkyu&nbsp;Park<sup>4</sup> · 
-Sangpil&nbsp;Kim<sup>2†</sup> · 
-Hyunhee&nbsp;Park<sup>4†</sup> · 
-[Seungryong&nbsp;Kim<sup>1†</sup>](https://cvlab.kaist.ac.kr/)
-
-<sup>*</sup> Equal contribution
 <sup>1</sup> KAIST&nbsp;AI ·
 <sup>2</sup> Korea&nbsp;University ·
 <sup>3</sup> Yonsei&nbsp;University ·
 <sup>4</sup> Samsung&nbsp;Electronics
 
+<sup>*</sup> Equal contribution. <sup>&dagger;</sup>Co-corresponding author.
+
+<a href="https://arxiv.org/abs/2506.09993"><img src="https://img.shields.io/badge/arXiv-2506.09993-B31B1B"></a>
+        <a href="https://cvlab-kaist.github.io/TAIR/"><img src="https://img.shields.io/badge/Project%20Page-online-1E90FF"></a>
+        <a href="https://huggingface.co/datasets/Min-Jaewon/SA-Text"><img src="https://img.shields.io/badge/HuggingFace-SA--Text-yellow?logo=huggingface&logoColor=yellow"></a>
+        <a href="https://huggingface.co/datasets/Min-Jaewon/Real-Text"><img src="https://img.shields.io/badge/HuggingFace-Real--Text-yellow?logo=huggingface&logoColor=yellow"></a>
+
+
+
 
 </div>
 
-## 📢 News
+---
+## 📢 News 
+- ❤️ **2025.06.24** - Training and demo code is released!
 - 🤗 **2025.06.19** — **SA-Text** and **Real-Text** datasets are released along with the [dataset pipeline](https://github.com/paulcho98/text_restoration_dataset/tree/main)!
 - 📄 **2025.06.12** — Arxiv paper is released! 
 - 🚀 **2025.06.01** — Official launch of the repository and project page!
+---
 
 
 ## 💾 SA-Text Dataset
 **SA-Text** is a newly proposed dataset for **Text-Aware Image Restoration (TAIR)** task. It is built from  **SA-1B** dataset using our [dataset pipeline](https://github.com/paulcho98/text_restoration_dataset/tree/main) and  consists of **100K** image-text instance pairs with detailed scene-level annotations.
-
 **Real-Text** is an evaluation dataset for real-world scenarios. It is constructed from [RealSR](https://github.com/csjcai/RealSR) and [DrealSR](https://github.com/xiezw5/Component-Divide-and-Conquer-for-Real-World-Image-Super-Resolution) using same pipeline as above.
 
----
 
-### Dataset Download
+
+### Dataset Preparation
 
 | Split             | Hugging Face 🤗 | Google Drive 📁 |
 |------------------|:---------------:|:---------------:|
@@ -58,80 +53,58 @@ Hyunhee&nbsp;Park<sup>4†</sup> ·
 | **Real-Text**     | <div align="center">[Link](https://huggingface.co/datasets/Min-Jaewon/Real-Text)</div> | <div align="center">[Link](https://drive.google.com/file/d/1sIjeFe0Rq6IvYEC-pkz6aQ4ubuIge4xi/view?usp=sharing)</div> |
 
 
-### Structure of dataset from 'Google Drive'
+### Dataset Folder Structure (Google Drive)
+
+- Each image is paired with one or more text instances with polygon-level annotations.
+- The dataset follows a consistent annotation format, detailed in the [dataset pipeline](https://github.com/paulcho98/text_restoration_dataset/tree/main).
+- We recommend using the dataset from Google Drive for testing our code.
+
 ```
-SA-Text/
+sa_text/
 ├── images/                        # 100K hiqh-quality scene images with text instances
 └── restoration_dataset.json       # Annotations
 
-Real-Text/
+real_text/
 ├── HQ/                            # High-quality images
 ├── LQ/                            # Low-quality degraded inputs
 └── real_benchmark_dataset.json    # Annotations
 ```
 ---
 
-### Notes
+##  ⚒️ Training Preparation
 
-- Each image is paired with one or more text instances with polygon-level annotations.
-- The dataset follows a consistent annotation format, detailed in the [dataset pipeline](https://github.com/paulcho98/text_restoration_dataset/tree/main).
-- We recommend using the dataset from Google Drive for testing our code.
-
-
-
-## ⚒️ Dependency and Environment Setup
-
-#### 1. Clone repo
+### Environment
 ```
-git clone https://github.com/jinlovespho/DiffBIR.git -b pho
-cd DiffBIR 
+conda create -n tair python=3.10 -y
+conda activate tair
 ```
 
-#### 2. Setup conda environment
+### Installation
 ```
-conda create -n terediff python=3.10 -y
-conda activate terediff
-```
-
-#### 3. Install libraries
-```
-# torch installation
 pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cu121
-
-# other requirements
 pip install -r requirements.txt
-
-# install detectron2 if detectron2 is not in the folder
-# python -m pip3 install 'git+https://github.com/facebookresearch/detectron2.git'
 cd detectron2 
 pip install -e .
-
-# install testr
 cd testr 
 pip install -e .
 ```
 
-#### 4. Download pretrained weights
-1. First download pretrained weights by running the following bash file.
-```
-bash download_weights.sh
-```
-2. Additionally, download the pretrained text spotting module's weight from this [link](https://ucsdcloud-my.sharepoint.com/personal/xiz102_ucsd_edu/_layouts/15/onedrive.aspx?id=%2Fpersonal%2Fxiz102%5Fucsd%5Fedu%2FDocuments%2Fpublish%2Fcvpr22%5Ftestr%2Fweights%2Ftotaltext%5Ftestr%5FR%5F50%5Fpolygon%2Epth&parent=%2Fpersonal%2Fxiz102%5Fucsd%5Fedu%2FDocuments%2Fpublish%2Fcvpr22%5Ftestr%2Fweights&ga=1) and place it inside **./weights** folder.
+### Download Pretrained Weights and Dataset
 
+1. Run the bash script `download_weights.sh` to download the pretrained weights for the image restoration module.  
+   Additionally, download the pretrained text spotting module from [this link](https://ucsdcloud-my.sharepoint.com/:u:/g/personal/xiz102_ucsd_edu/ESwSFxppsplEiEaUphJB0TABkIKoRvIljkVIazPUNEXI7g?e=Q8zJ0Q) and place it in the `./weights` directory.
 
+2. Download the SA-Text dataset using the **Google Drive** link provided [above](#dataset-download).  
+   Once downloaded, unzip the contents and place the folder in your working directory.
+---
 
-#### 5. Download dataset
-
-
-
-
-## 🔧 Training 
+## 🔥 Training Recipe
 Our text-aware restoration model, **TeReDiff**, comprises two main modules: an image restoration module and a text spotting module. 
 Training is conducted in three stages:
 - **Stage 1**: Train only the image restoration module.
 - **Stage 2**: Train only the text spotting module.
 - **Stage 3**: Jointly train both modules.
----
+
 
 ### Stage1 Training Script
 Run the following bash script for **Stage1** training. Its configuration file can be found [here](configs/train/train_stage1_terediff.yaml)
@@ -155,27 +128,11 @@ bash run_script/train_script/run_train_stage3_terediff.sh
 ```
 
 
-## 🚀 Inference 
-The following scripts can be used for inferencing on low-quality images to obtain high-quality text-aware restored images.
+## 🚀 Text-Aware Image Restoration (TAIR) Demo
 
-### Evaluation on SA-Text (Lv1) 
+Run the following script to perform a demo on four low-quality images and generate high-quality, text-aware restored images.
 ```
-
-```
-
-### Evaluation on SA-Text (Lv2)
-```
-
-```
-
-### Evaluation on SA-Text (Lv3)
-```
-
-```
-
-### Evaluation on Real-Text
-```
-
+bash run_script/val_script/run_val_terediff.sh
 ```
 
 
