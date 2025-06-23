@@ -1,7 +1,6 @@
 <div align="center">
 <h1>
- TAIR: Text-Aware Image Restoration with Diffusion Models</h1>
-
+Text-Aware Image Restoration with Diffusion Models</h1>
 
 [**Jaewon Min**](https://github.com/Min-Jaewon/)<sup>1*</sup>, 
 [**Jin Hyeon Kim**](https://github.com/jinlovespho)<sup>2*</sup>, 
@@ -24,13 +23,9 @@
         <a href="https://cvlab-kaist.github.io/TAIR/"><img src="https://img.shields.io/badge/Project%20Page-online-1E90FF"></a>
         <a href="https://huggingface.co/datasets/Min-Jaewon/SA-Text"><img src="https://img.shields.io/badge/HuggingFace-SA--Text-yellow?logo=huggingface&logoColor=yellow"></a>
         <a href="https://huggingface.co/datasets/Min-Jaewon/Real-Text"><img src="https://img.shields.io/badge/HuggingFace-Real--Text-yellow?logo=huggingface&logoColor=yellow"></a>
-
-
-
-
 </div>
 
----
+
 ## 📢 News 
 - ❤️ **2025.06.24** - Training and demo code is released!
 - 🤗 **2025.06.19** — **SA-Text** and **Real-Text** datasets are released along with the [dataset pipeline](https://github.com/paulcho98/text_restoration_dataset/tree/main)!
@@ -94,7 +89,7 @@ pip install -e .
 1. Run the bash script `download_weights.sh` to download the pretrained weights for the image restoration module.  
    Additionally, download the pretrained text spotting module from [this link](https://ucsdcloud-my.sharepoint.com/:u:/g/personal/xiz102_ucsd_edu/ESwSFxppsplEiEaUphJB0TABkIKoRvIljkVIazPUNEXI7g?e=Q8zJ0Q) and place it in the `./weights` directory.
 
-2. Download the SA-Text dataset using the **Google Drive** link provided [above](#dataset-download).  
+2. Download the SA-Text dataset using the **Google Drive** link provided above.
    Once downloaded, unzip the contents and place the folder in your working directory.
 ---
 
@@ -106,21 +101,34 @@ Training is conducted in three stages:
 - **Stage 3**: Jointly train both modules.
 
 
-### Stage1 Training Script
+#### Training Script
+The training configuration files for three stages: [stage1](configs/train/train_stage1_terediff.yaml), [stage2](configs/train/train_stage2_terediff.yaml), [stage3](configs/train/train_stage3_terediff.yaml)
+```
+# stage1
+bash run_script/train_script/run_train_stage1_terediff.sh
+
+# stage2
+bash run_script/train_script/run_train_stage2_terediff.sh
+
+# stage3
+bash run_script/train_script/run_train_stage3_terediff.sh
+```
+
+#### Stage1 Training Script
 Run the following bash script for **Stage1** training. Its configuration file can be found [here](configs/train/train_stage1_terediff.yaml)
 
 ```
 bash run_script/train_script/run_train_stage1_terediff.sh
 ```
 
-### Stage2 Training Script
+#### Stage2 Training Script
 Run the following bash script for **Stage2** training. Its configuration file can be found [here](configs/train/train_stage2_terediff.yaml)
 
 ```
 bash run_script/train_script/run_train_stage2_terediff.sh
 ```
 
-### Stage3 Training Script
+#### Stage3 Training Script
 Run the following bash script for **Stage3** training. Its configuration file can be found [here](configs/train/train_stage3_terediff.yaml)
 
 ```
