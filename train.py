@@ -139,6 +139,9 @@ def main(args):
             lq = rearrange(lq, "b h w c -> b c h w").contiguous().float()   # b 3 512 512 [0,1]
             train_bs = gt.shape[0]
             
+            # override train_prompt with null prompt
+            train_prompt = [''] * train_bs
+            
             # prepare VAE, condition, timestep
             with torch.no_grad():
                 z_0 = pure_cldm.vae_encode(gt)                              # b 4 64 64
@@ -393,6 +396,9 @@ def main(args):
                     val_gt = rearrange(val_gt, "b h w c -> b c h w").contiguous().float()   # b 3 512 512
                     val_lq = rearrange(val_lq, "b h w c -> b c h w").contiguous().float()
                     val_bs, _, val_H, val_W = val_gt.shape
+                    
+                    # override val_prompt with null prompt
+                    val_prompt = [''] * val_bs
                     
                     # put models on evaluation for sampling
                     for model in models.values():
